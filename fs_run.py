@@ -41,7 +41,18 @@ def cfg_hash(cfg):
 def plan_cfg(cfg, tool_entry=None):
     """EINZIGE Stelle, an der die Planungs-Einstellungen festgelegt werden – für Vorschau UND Operationen
     (1.0.5): Vorgaben + Dialogwerte, Werkzeug-Ø aus dem gewählten Werkzeug (sonst Planungs-Ø)."""
-    cfg = dict(G.DEFAULTS, **(cfg or {}))
+    raw = dict(cfg or {})
+    cfg = dict(G.DEFAULTS, **raw)
+    # 2.0.9: Legacy zustellung → az_vor/az_final wenn nur zustellung gesetzt
+    if 'zustellung' in raw and 'az_vor' not in raw and 'az_final' not in raw:
+        try:
+            z = float(raw['zustellung'])
+            cfg['az_vor'] = cfg['az_final'] = z
+            cfg['zustellung'] = z
+        except (TypeError, ValueError):
+            pass
+    cfg['stege_vor'] = False
+    cfg['bruecken_vor'] = False
     if tool_entry and tool_entry.get('info', {}).get('d_mm'):
         cfg['tool_d'] = float(tool_entry['info']['d_mm'])
     return cfg

@@ -954,13 +954,15 @@ def _legacy_pair(cfg, base, suf, default):
 
 
 def _op_tab_cfg(cfg, premill=False):
-    """Form/Breite/Höhe + ob Tabs an für Vor- oder Final-Op."""
-    suf = '_vor' if premill else '_final'
-    on = cfg.get('stege' + suf)
+    """Form/Breite/Höhe + ob Tabs an. 2.0.9: Vorfräs nie Stege/Brücken."""
+    if premill:
+        c = dict(cfg)
+        c['stege'] = False
+        return c, False
+    suf = '_final'
+    on = cfg.get('stege_final')
     if on is None:
-        on = cfg.get('stege', True) if not premill else False
-    elif not premill and cfg.get('stege') is False and on is True and cfg.get('stege_vor') is False:
-        pass  # explicit
+        on = cfg.get('stege', True)
     form = _legacy_pair(cfg, 'steg_form', suf, 'rechteckig')
     br = _legacy_pair(cfg, 'steg_breite', suf, 8.0)
     ho = _legacy_pair(cfg, 'steg_hoehe', suf, 3.0)
@@ -970,6 +972,73 @@ def _op_tab_cfg(cfg, premill=False):
     c['steg_breite'] = float(br)
     c['steg_hoehe'] = float(ho)
     return c, bool(on)
+
+
+def _suf(premill):
+    return '_vor' if premill else '_final'
+
+
+def _cfg_f(cfg, key, default=0.0):
+    try:
+        return float(cfg.get(key, default) or default)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def lead_in_params(op, cfg, premill, rec):
+    """Anfahrart Rampe / Eintauchen / Bogen – nur setzen wenn Parameter existieren."""
+    ps = op.parameters
+    suf = _suf(premill)
+    art = (cfg.get('anfahr_art' + suf) or ('rampe' if premill else 'bogen')).lower()
+    set_bool(ps, 'doLeadIn', True, rec)
+    # Art
+    if art == 'eintauchen':
+        set_choice(ps, 'leadInType', 'plunge', ('plunge', 'vertical', 'eintauch'), rec)
+        set_choice(ps, 'entry_horizontal', 'plunge', ('plunge', 'vertical'), rec)
+        set_bool(ps, 'useRamp', False, rec)
+    elif art == 'bogen':
+        set_choice(ps, 'leadInType', 'smooth', ('smooth', 'arc', 'circular', 'horizontal', 'bogen'), rec)
+        set_choice(ps, 'entry_horizontal', 'horizontal', ('horizontal', 'arc', 'smooth'), rec)
+        set_bool(ps, 'useRamp', False, rec)
+    else:  # rampe
+        set_choice(ps, 'leadInType', 'ramp', ('ramp', 'rampe'), rec)
+        set_choice(ps, 'entry_horizontal', 'ramp', ('ramp',), rec)
+        set_bool(ps, 'useRamp', True, rec)
+        set_choice(ps, 'rampType', 'plunge zig zag', ('zig', 'zag', 'ramp'), rec)
+    ang = _cfg_f(cfg, 'rampenwinkel' + suf, 3.0)
+    leng = _cfg_f(cfg, 'rampenlaenge' + suf, 10.0)
+    rad = _cfg_f(cfg, 'bogenradius' + suf, 5.0)
+    pct = _cfg_f(cfg, 'einfahrt_pct' + suf, 50.0)
+    set_number(ps, 'rampAngle', ang, rec)
+    set_number(ps, 'leadInAngle', ang, rec)
+    set_length(ps, 'rampLength', leng, rec)
+    set_length(ps, 'horizontalLeadInDistance', leng, rec)
+    set_length(ps, 'leadInSweepDistance', leng, rec)
+    set_length(ps, 'leadInRadius', rad, rec)
+    set_length(ps, 'horizontalLeadInRadius', rad, rec)
+    # Einfahrvorschub % – Fusion oft 0..1 oder %
+    set_number(ps, 'leadInFeedrate', pct, rec)
+    set_number(ps, 'entry_feedrate', pct / 100.0 if pct > 1 else pct, rec)
+    set_number(ps, 'rampFeedrate', pct, rec)
+    rec['anfahr'] = {'art': art, 'winkel': ang, 'laenge': leng, 'radius': rad, 'pct': pct}
+
+
+def feed_speed_params(op, cfg, premill, rec):
+    """Schnittwerte vf/spindle (vc/fz informativ in rec)."""
+    ps = op.parameters
+    suf = _suf(premill)
+    vf = _cfg_f(cfg, 'vf' + suf, 0.0)
+    rpm = _cfg_f(cfg, 'spindle' + suf, 0.0)
+    vc = _cfg_f(cfg, 'vc' + suf, 0.0)
+    fz = _cfg_f(cfg, 'fz' + suf, 0.0)
+    if vf > 0:
+        set_number(ps, 'tool_feedCutting', vf, rec)
+        set_number(ps, 'feedrate', vf, rec)
+        set_number(ps, 'cuttingFeedrate', vf, rec)
+    if rpm > 0:
+        set_number(ps, 'tool_spindleSpeed', rpm, rec)
+        set_number(ps, 'spindleSpeed', rpm, rec)
+    rec['feeds'] = {'vf': vf, 'spindle': rpm, 'vc': vc, 'fz': fz}
 
 
 def common_params(op, cfg, depth_mm, rec, finish=False, leave_mm=0.0, stock=None, premill=False):
@@ -988,7 +1057,8 @@ def common_params(op, cfg, depth_mm, rec, finish=False, leave_mm=0.0, stock=None
     leave = max(0.0, float(leave_mm or 0.0))
     set_length(ps, 'bottomHeight_offset', -float(cfg['durchstich']) + leave, rec)
     cut_depth = max(0.1, float(depth_mm) - leave)
-    zst = float(cfg['zustellung'])
+    suf = _suf(premill)
+    zst = _cfg_f(cfg, 'az' + suf, _cfg_f(cfg, 'zustellung', 6.0))
     if not finish and 0 < zst < cut_depth - 1e-6:
         set_bool(ps, 'doMultipleDepths', True, rec)
         set_length(ps, 'maximumStepdown', zst, rec)
@@ -1004,7 +1074,8 @@ def common_params(op, cfg, depth_mm, rec, finish=False, leave_mm=0.0, stock=None
         set_length(ps, 'verticalStockToLeave', 0.0, rec)
     else:
         set_bool(ps, 'useStockToLeave', False, rec)
-    set_bool(ps, 'doLeadIn', True, rec)
+    lead_in_params(op, cfg, premill, rec)
+    feed_speed_params(op, cfg, premill, rec)
 
 
 def tab_params(op, cfg, tabs, perimeter, pf, rec):

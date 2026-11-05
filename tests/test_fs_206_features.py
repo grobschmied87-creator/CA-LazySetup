@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LazySetup 2.0.8: bridge_move, Vorfräs-Defaults/Params, i18n, Version."""
+"""LazySetup 2.0.9: bridge_move, Vorfräs-Defaults/Params, i18n, Version."""
 import os
 import sys
 import unittest
@@ -17,7 +17,7 @@ from ca_core import ca_i18n
 class TestVersion(unittest.TestCase):
     def test_version(self):
         import LazySetup as LS
-        self.assertEqual(LS.VERSION, '2.0.8')
+        self.assertEqual(LS.VERSION, '2.0.9')
 
 
 class TestI18n(unittest.TestCase):

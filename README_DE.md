@@ -2,7 +2,7 @@
 
 Fusion-360-Add-in zur Fräsvorbereitung: Silhouetten, Stege, Vor-/Fertigfräsen, Werkzeugwahl, Planvorschau.
 
-**Version:** 2.0.8 · **Lizenz:** MIT · Autor: Chris Adam / Chris Adam Modellbau
+**Version:** 2.0.9 · **Lizenz:** MIT · Autor: Chris Adam / Chris Adam Modellbau
 
 ## Funktionen
 - Doppel-Schnitt (Vorfräsen + Fertigfräsen) mit eigener Richtung/Stegen

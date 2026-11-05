@@ -80,7 +80,7 @@ class Palette(Base):
         LS._load_tools()
         s = LS.handle('ready', {})
         json.dumps(s, default=str)
-        self.assertEqual(s['version'], '2.0.8')
+        self.assertEqual(s['version'], '2.0.9')
         self.assertEqual([x['name'] for x in s['sheets']], ['Rohteil 01:1'])
         self.assertEqual(len(s['fields']), len(LS.FIELDS))
         self.assertTrue(s['plan']['parts'])
@@ -135,14 +135,14 @@ class Palette(Base):
             st = json.load(f)
         self.assertEqual(st['cfg']['richtung'], 'gegen')
         self.assertTrue(st['tool_label'].startswith('T3'))
-        self.assertEqual(st['version'], '2.0.8')
+        self.assertEqual(st['version'], '2.0.9')
 
     def test_license_and_diag(self):
         st = LS.handle('license', {'key': 'ignored'})
         self.assertTrue(st.get('licensed'))
         self.assertTrue(st.get('apply_allowed'))
         d = LS.handle('diag', {})
-        self.assertIn('CA LazySetup 2.0.8', d['text'])
+        self.assertIn('CA LazySetup 2.0.9', d['text'])
         self.assertNotIn('PRIVATE', d['text'].upper())
         self.assertNotIn('Maschinen-ID', d['text'])
 

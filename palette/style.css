@@ -134,3 +134,5 @@ details summary { cursor: pointer; font-weight: 600; margin: 4px 0; }
 .order-row .nr { width: 1.6em; font-weight: 700; }
 .order-row .nm { flex: 1; }
 .order-row button.small, .order-head button.small { padding: 0 6px; min-width: 28px; }
+
+.fsub{font-size:11px;color:#a8d4a8;margin:8px 0 3px;font-weight:600;grid-column:1/-1}

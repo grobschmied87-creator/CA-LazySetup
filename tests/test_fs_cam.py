@@ -105,7 +105,7 @@ class Operations(Base):
             self.assertEqual(P(op, 'bottomHeight_mode').value.value, 'from stock bottom')
             self.assertAlmostEqual(P(op, 'bottomHeight_offset').value.value, -0.03)
             self.assertTrue(P(op, 'doMultipleDepths').value.value)
-            self.assertAlmostEqual(P(op, 'maximumStepdown').value.value, 0.6)
+            self.assertAlmostEqual(P(op, 'maximumStepdown').value.value, 0.3)  # az_final default 3 mm
             self.assertFalse(P(op, 'useStockToLeave').value.value)
             self.assertEqual(len(P(op, 'entryPositions').value.value), 1)
             ch = P(op, 'contours').value.applied

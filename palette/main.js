@@ -86,6 +86,10 @@
       var fs = el('fieldset', {}, host); el('legend', {}, fs, g[1]);
       var grid = el('div', { className: 'fgrid' }, fs);
       fields.filter(function (f) { return f.group === g[0]; }).forEach(function (f) {
+        if (f.kind === 'h') {
+          el('div', { className: 'fsub' }, grid, f.label);
+          return;
+        }
         var id = 'f_' + f.key, inp;
         if (f.kind === 'b') {
           var lb = el('label', { className: 'check' }, grid);
@@ -99,7 +103,7 @@
             inp = el('input', { id: id, type: 'number', min: f.min, max: f.max, step: f.step }, l2);
           }
         }
-        // 2.0.7: Zahlen nur über „Vorschau aktualisieren“; Checkbox/Select sofort
+        // Zahlen nur über „Aktualisieren“; Checkbox/Select sofort
         if (f.kind === 'b' || f.kind === 'd') {
           inp.addEventListener('change', changed);
         } else {
@@ -112,6 +116,7 @@
   function fillCfg(cfg) {
     S.cfg = cfg || {};
     S.fields.forEach(function (f) {
+      if (f.kind === 'h') return;
       var i = $('f_' + f.key); if (!i || !(f.key in S.cfg)) return;
       if (f.kind === 'b') i.checked = !!S.cfg[f.key]; else i.value = S.cfg[f.key];
     });
@@ -120,6 +125,7 @@
   function collectCfg() {
     var c = {};
     S.fields.forEach(function (f) {
+      if (f.kind === 'h') return;
       var i = $('f_' + f.key); if (!i) return;
       if (f.kind === 'b') c[f.key] = i.checked;
       else if (f.kind === 'd') c[f.key] = i.value;

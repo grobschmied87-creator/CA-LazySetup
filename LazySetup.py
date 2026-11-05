@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""CA LazySetup 2.0.8 (vormals Finalschnitt 1.3.1) – Fertigschnitt (2D-Kontur) für CA-LazyNest-/ContourNest-Rohteile.
+"""CA LazySetup 2.0.9 (vormals Finalschnitt 1.3.1) – Fertigschnitt (2D-Kontur) für CA-LazyNest-/ContourNest-Rohteile.
 
 EIN Fenster (Palette, wie CA LazyNest): Kopf mit Logo, Register Rohteile / Werkzeug / Bearbeitung / Stege / Vorschau /
 Ergebnis, Infobox (Lizenz, Diagnose), hell/dunkel nach Fusion-Farbschema. In der Vorschau werden Halte-/Brückenstege
@@ -53,7 +53,7 @@ REFS = CORE.ca_refs
 DIAG = CORE.ca_diag
 PRODUCT = 'lazysetup'
 
-VERSION = '2.0.8'               # EINZIGE Versionsquelle (Manifest-Text, Tooltip, Protokoll, Operations-Attribut)
+VERSION = '2.0.9'               # EINZIGE Versionsquelle (Manifest-Text, Tooltip, Protokoll, Operations-Attribut)
 BUILD_DATE = '2026-11-05'
 APP_NAME = 'CA LazySetup'
 L.VERSION = VERSION
@@ -88,6 +88,7 @@ STARTLAGE = (('ecke', 'Ecke nahe Plattenmitte'), ('kante', 'Kantenmitte zur Plat
              ('naechster', 'Nächster Punkt zur Mitte (ohne Eckbevorzugung)'))
 REIHENFOLGE = (('rest', 'Größte zusammenhängende Restfläche (Vakuum)'),
                ('gewichtung', 'Gewichtung Fläche/Randnähe (alt, bis 1.0.6)'))
+ANFAHR = (("rampe", "Rampe"), ("eintauchen", "Eintauchen"), ("bogen", "Bogen anfahren"))
 STEGFORM = (('rechteckig', 'Rechteckig'), ('dreieckig', 'Dreieckig (Rampe)'))
 NEUBERECHNEN = (('auto', 'Automatisch (nur wenn die Zeitachse geändert wurde)'), ('immer', 'Immer (langsam, sicher)'),
                 ('nie', 'Nie (eigene Verantwortung)'))
@@ -101,31 +102,50 @@ BUILTIN_PRESETS = {
 
 # (Schlüssel, Art, Beschriftung, Gruppe, Zusatz) – Art: f=Kommazahl, i=Ganzzahl, b=Ja/Nein, d=Auswahl
 FIELDS = (
-    # Vorfräsen (Schnitt-Block 1)
-    ('vorfraesen', 'b', 'Vorfräsen (Schruppen vor dem Fertigschnitt)', 'schnitt_vor', None),
-    ('vorfraes_rest_mm', 'f', 'Vorfräs: Resttiefe für Schlicht (mm)', 'schnitt_vor', (0.1, 20.0, 0.1)),
-    ('vorfraes_aufmass', 'f', 'Vorfräs: seitliches Aufmaß (mm)', 'schnitt_vor', (0.0, 5.0, 0.1)),
+    # Vorfräsen – ein Durchgang, keine Stege/Brücken
+    ('vorfraesen', 'b', 'Vorfräsen aktiv', 'schnitt_vor', None),
+    ('richtung_vor', 'd', 'Fräsrichtung', 'schnitt_vor', RICHTUNG),
+    ('vorfraes_rest_mm', 'f', 'Bodentiefe / Rest zum Fertig (mm)', 'schnitt_vor', (0.1, 20.0, 0.1)),
+    ('vorfraes_aufmass', 'f', 'Seitliches Aufmaß (mm)', 'schnitt_vor', (0.0, 5.0, 0.1)),
+    ('hdr_anfahr_vor', 'h', 'Anfahren / Einfahren', 'schnitt_vor', None),
+    ('anfahr_art_vor', 'd', 'Anfahrart', 'schnitt_vor', ANFAHR),
+    ('rampenwinkel_vor', 'f', 'Rampenwinkel (°)', 'schnitt_vor', (0.5, 45.0, 0.5)),
+    ('rampenlaenge_vor', 'f', 'Rampenlänge / Abstand (mm)', 'schnitt_vor', (0.5, 200.0, 1.0)),
+    ('bogenradius_vor', 'f', 'Bogenradius (mm)', 'schnitt_vor', (0.5, 100.0, 0.5)),
+    ('einfahrt_pct_vor', 'f', 'Einfahrvorschub (%)', 'schnitt_vor', (5.0, 100.0, 5.0)),
+    ('hdr_schnitt_vor', 'h', 'Schnittwerte', 'schnitt_vor', None),
+    ('az_vor', 'f', 'Zustellung az (mm)', 'schnitt_vor', (0.1, 60.0, 0.5)),
+    ('vc_vor', 'f', 'Schnittgeschwindigkeit vc (m/min)', 'schnitt_vor', (1.0, 5000.0, 10.0)),
+    ('fz_vor', 'f', 'Zahnvorschub fz (mm)', 'schnitt_vor', (0.001, 5.0, 0.01)),
+    ('spindle_vor', 'f', 'Spindel (U/min)', 'schnitt_vor', (100.0, 60000.0, 100.0)),
+    ('vf_vor', 'f', 'Vorschub vf (mm/min)', 'schnitt_vor', (1.0, 20000.0, 10.0)),
     ('durchstich', 'f', 'Durchstich (mm)', 'schnitt_vor', (0.0, 5.0, 0.1)),
-    ('zustellung', 'f', 'Max. Zustellung (mm)', 'schnitt_vor', (0.5, 60.0, 0.5)),
-    ('richtung_vor', 'd', 'Fräsrichtung Vorfräsen', 'schnitt_vor', RICHTUNG),
     ('innen_zuerst', 'b', 'Innenkonturen zuerst', 'schnitt_vor', None),
     ('taschen', 'b', 'Taschen einbeziehen (2D-Tasche)', 'schnitt_vor', None),
     ('gruppierung', 'd', 'Außenkonturen', 'schnitt_vor', GRUPPIERUNG),
     ('seite_umkehren', 'b', 'Werkzeugseite umkehren (falls Fusion innen fräst)', 'schnitt_vor', None),
-    ('stege_vor', 'b', 'Haltestege Vorfräsen', 'schnitt_vor', None),
-    ('steg_form_vor', 'd', 'Stegform Vorfräsen', 'schnitt_vor', STEGFORM),
-    ('steg_breite_vor', 'f', 'Stegbreite Vorfräsen (mm)', 'schnitt_vor', (1.0, 50.0, 0.5)),
-    ('steg_hoehe_vor', 'f', 'Steghöhe Vorfräsen (mm)', 'schnitt_vor', (0.5, 20.0, 0.5)),
-    ('bruecken_vor', 'b', 'Brückenstege Vorfräsen', 'schnitt_vor', None),
-    # Fertigfräsen (Schnitt-Block 2)
+    # Fertigfräsen
+    ('richtung_final', 'd', 'Fräsrichtung', 'schnitt_final', RICHTUNG),
     ('schlicht_zugabe', 'f', 'Schlichtzugabe radial (mm)', 'schnitt_final', (0.0, 3.0, 0.1)),
     ('schlichtgang', 'b', 'Schlichtgang (2. Umlauf ohne Aufmaß)', 'schnitt_final', None),
-    ('richtung_final', 'd', 'Fräsrichtung Fertigfräsen', 'schnitt_final', RICHTUNG),
-    ('stege_final', 'b', 'Haltestege Fertigfräsen', 'schnitt_final', None),
-    ('steg_form_final', 'd', 'Stegform Fertigfräsen', 'schnitt_final', STEGFORM),
-    ('steg_breite_final', 'f', 'Stegbreite Fertigfräsen (mm)', 'schnitt_final', (1.0, 50.0, 0.5)),
-    ('steg_hoehe_final', 'f', 'Steghöhe Fertigfräsen (mm)', 'schnitt_final', (0.5, 20.0, 0.5)),
-    ('bruecken_final', 'b', 'Brückenstege Fertigfräsen', 'schnitt_final', None),
+    ('hdr_anfahr_final', 'h', 'Anfahren / Einfahren', 'schnitt_final', None),
+    ('anfahr_art_final', 'd', 'Anfahrart', 'schnitt_final', ANFAHR),
+    ('rampenwinkel_final', 'f', 'Rampenwinkel (°)', 'schnitt_final', (0.5, 45.0, 0.5)),
+    ('rampenlaenge_final', 'f', 'Rampenlänge / Abstand (mm)', 'schnitt_final', (0.5, 200.0, 1.0)),
+    ('bogenradius_final', 'f', 'Bogenradius (mm)', 'schnitt_final', (0.5, 100.0, 0.5)),
+    ('einfahrt_pct_final', 'f', 'Einfahrvorschub (%)', 'schnitt_final', (5.0, 100.0, 5.0)),
+    ('hdr_schnitt_final', 'h', 'Schnittwerte', 'schnitt_final', None),
+    ('az_final', 'f', 'Zustellung az (mm)', 'schnitt_final', (0.1, 60.0, 0.5)),
+    ('vc_final', 'f', 'Schnittgeschwindigkeit vc (m/min)', 'schnitt_final', (1.0, 5000.0, 10.0)),
+    ('fz_final', 'f', 'Zahnvorschub fz (mm)', 'schnitt_final', (0.001, 5.0, 0.01)),
+    ('spindle_final', 'f', 'Spindel (U/min)', 'schnitt_final', (100.0, 60000.0, 100.0)),
+    ('vf_final', 'f', 'Vorschub vf (mm/min)', 'schnitt_final', (1.0, 20000.0, 10.0)),
+    ('hdr_stege_final', 'h', 'Stege', 'schnitt_final', None),
+    ('stege_final', 'b', 'Haltestege', 'schnitt_final', None),
+    ('bruecken_final', 'b', 'Brückenstege', 'schnitt_final', None),
+    ('steg_breite_final', 'f', 'Stegbreite (mm)', 'schnitt_final', (1.0, 50.0, 0.5)),
+    ('steg_hoehe_final', 'f', 'Steghöhe (mm)', 'schnitt_final', (0.5, 20.0, 0.5)),
+    ('steg_form_final', 'd', 'Stegform', 'schnitt_final', STEGFORM),
     ('reihenfolge', 'd', 'Reihenfolge-Regel', 'reihe', REIHENFOLGE),
     ('w_flaeche', 'i', 'Gewichtung Fläche % (nur Regel „alt“)', 'reihe', (0, 100, 5)),
     ('kleinteile_zuerst', 'b', 'Kleinteile (unter Mindestfläche) immer zuerst', 'reihe', None),
@@ -243,7 +263,7 @@ def clean_cfg(raw, base=None):
     cfg = dict(base or G.DEFAULTS)
     raw = raw or {}
     for key, kind, _l, _g, extra in FIELDS:
-        if key not in raw:
+        if kind == 'h' or key not in raw:
             continue
         v = raw[key]
         try:
@@ -254,7 +274,7 @@ def clean_cfg(raw, base=None):
                 x = float(str(v).replace(',', '.'))
                 x = min(max(x, lo), hi)
                 cfg[key] = int(round(x)) if kind == 'i' else x
-            elif v in [a for a, _b in extra]:
+            elif kind == 'd' and v in [a for a, _b in extra]:
                 cfg[key] = v
         except (TypeError, ValueError):
             L.warn('Eingabe %s: %r ungültig – %r bleibt', key, v, cfg.get(key))
@@ -274,18 +294,29 @@ def clean_cfg(raw, base=None):
             cfg[rk] = 'gleich'
     if 'richtung_vor' in cfg or 'richtung_final' in cfg:
         cfg['richtung'] = cfg.get('richtung_final', cfg.get('richtung_vor', cfg.get('richtung', 'gleich')))
+    # 2.0.9: Vorfräs ohne Stege; Legacy zustellung → az_*; Final-Stege ↔ Planung
+    cfg['stege_vor'] = False
+    cfg['bruecken_vor'] = False
+    if 'zustellung' in raw and 'az_vor' not in raw and 'az_final' not in raw:
+        try:
+            z = float(str(raw['zustellung']).replace(',', '.'))
+            cfg['az_vor'] = cfg['az_final'] = z
+            cfg['zustellung'] = z
+        except (TypeError, ValueError):
+            pass
+    if 'az_vor' in cfg or 'az_final' in cfg:
+        cfg['zustellung'] = float(cfg.get('az_vor') or cfg.get('az_final') or cfg.get('zustellung') or 6.0)
     for src, dsts in (
-        ('stege', ('stege_vor', 'stege_final')),
-        ('steg_form', ('steg_form_vor', 'steg_form_final')),
-        ('steg_breite', ('steg_breite_vor', 'steg_breite_final')),
-        ('steg_hoehe', ('steg_hoehe_vor', 'steg_hoehe_final')),
-        ('bruecken', ('bruecken_vor', 'bruecken_final')),
+        ('stege', ('stege_final',)),
+        ('steg_form', ('steg_form_final',)),
+        ('steg_breite', ('steg_breite_final',)),
+        ('steg_hoehe', ('steg_hoehe_final',)),
+        ('bruecken', ('bruecken_final',)),
     ):
         if src in raw:
             for dkey in dsts:
                 if dkey not in raw:
                     cfg[dkey] = cfg.get(src) if src in cfg else raw[src]
-    # Planung: Form/Maß aus Final, wenn Final-Keys aus der Eingabe kommen
     touched = set(raw)
     if 'steg_form_final' in touched or 'steg_form' in touched:
         cfg['steg_form'] = cfg.get('steg_form_final', cfg.get('steg_form'))
@@ -293,10 +324,10 @@ def clean_cfg(raw, base=None):
         cfg['steg_breite'] = cfg.get('steg_breite_final', cfg.get('steg_breite'))
     if 'steg_hoehe_final' in touched or 'steg_hoehe' in touched:
         cfg['steg_hoehe'] = cfg.get('steg_hoehe_final', cfg.get('steg_hoehe'))
-    if 'stege_final' in touched or 'stege_vor' in touched or 'stege' in touched:
-        cfg['stege'] = bool(cfg.get('stege_final')) or bool(cfg.get('stege_vor'))
-    if 'bruecken_final' in touched or 'bruecken_vor' in touched or 'bruecken' in touched:
-        cfg['bruecken'] = bool(cfg.get('bruecken_final')) or bool(cfg.get('bruecken_vor'))
+    if 'stege_final' in touched or 'stege' in touched:
+        cfg['stege'] = bool(cfg.get('stege_final', cfg.get('stege', True)))
+    if 'bruecken_final' in touched or 'bruecken' in touched:
+        cfg['bruecken'] = bool(cfg.get('bruecken_final', cfg.get('bruecken', True)))
     return cfg
 
 
@@ -308,6 +339,9 @@ def fields_payload(lang=None):
         if lab == 'field.' + key:
             lab = label
         f = {'key': key, 'kind': kind, 'label': lab, 'group': grp}
+        if kind == 'h':
+            out.append(f)
+            continue
         if kind in ('f', 'i'):
             f['min'], f['max'], f['step'] = extra
         elif kind == 'd':

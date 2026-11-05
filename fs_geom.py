@@ -21,11 +21,31 @@ DEFAULTS = {
     'schlicht_zugabe': 0.0,     # radiale Aufmaßzugabe beim Schruppen
     'schlichtgang': False,      # zweiter Umlauf ohne Aufmaß
     'vorfraesen': False,        # Schrupp-Op vor Final (Resttiefe + seitl. Aufmaß)
-    'vorfraes_rest_mm': 1.0,     # Materialhöhe für Finalschnitt belassen
+    'vorfraes_rest_mm': 1.0,     # Bodentiefe / Rest zum Fertig
     'vorfraes_aufmass': 0.5,     # radiales Aufmaß der Vorfräs-Op
     'richtung': 'gleich',       # legacy; Migration → richtung_vor/final
     'richtung_vor': 'gleich',
     'richtung_final': 'gleich',
+    'anfahr_art_vor': 'rampe',
+    'rampenwinkel_vor': 3.0,
+    'rampenlaenge_vor': 10.0,
+    'bogenradius_vor': 5.0,
+    'einfahrt_pct_vor': 50.0,
+    'az_vor': 6.0,
+    'vc_vor': 800.0,
+    'fz_vor': 0.15,
+    'spindle_vor': 12000.0,
+    'vf_vor': 3600.0,
+    'anfahr_art_final': 'bogen',
+    'rampenwinkel_final': 2.0,
+    'rampenlaenge_final': 8.0,
+    'bogenradius_final': 4.0,
+    'einfahrt_pct_final': 40.0,
+    'az_final': 3.0,
+    'vc_final': 1000.0,
+    'fz_final': 0.08,
+    'spindle_final': 15000.0,
+    'vf_final': 2400.0,
     'innen_zuerst': True,
     'taschen': False,
     'gruppierung': 'je_teil',   # 'je_teil' / 'eine'
@@ -35,17 +55,17 @@ DEFAULTS = {
     'rest_raster': 10.0,        # Rastergröße für die Restflächen-Berechnung (mm)
     'rest_toleranz': 2.0,       # Gleichstand der Restfläche (%) -> kürzester Eilgang entscheidet
     'kleinteile_zuerst': True,
-    'stege': True,              # Planung + legacy; UI: stege_vor/final
-    'stege_vor': False,         # Tabs an Vorfräs-Ops (Default aus = bisheriges Verhalten)
+    'stege': True,              # Planung; Final-Op: stege_final (Vorfräs nie Tabs)
+    'stege_vor': False,         # immer aus (2.0.9)
     'stege_final': True,
     'steg_breite': 8.0,
     'steg_hoehe': 3.0,
     'steg_form': 'rechteckig',  # 'rechteckig' / 'dreieckig' (Planung)
-    'steg_breite_vor': 8.0,
+    'steg_breite_vor': 8.0,     # legacy keys kept for alte user_settings
     'steg_hoehe_vor': 3.0,
     'steg_form_vor': 'rechteckig',
-    'steg_breite_final': 8.0,
-    'steg_hoehe_final': 3.0,
+    'steg_breite_final': 3.0,
+    'steg_hoehe_final': 1.5,
     'steg_form_final': 'rechteckig',
     'vak_min_cm2': 100.0,       # Mindestfläche Vakuum (wie ContourNest)
     'steg_abstand_klein': 250.0,

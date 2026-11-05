@@ -22,7 +22,7 @@
 
   <header id="hdr">
     <img id="logo" src="img/logo_light.svg" alt="CA LazySetup">
-    <div id="appname"><b>CA LazySetup</b> <span id="ver" class="muted">v2.0.8</span></div>
+    <div id="appname"><b>CA LazySetup</b> <span id="ver" class="muted">v2.0.9</span></div>
     <button id="btnInfo" class="icon" title="Info, Lizenz, Diagnose" data-i18n-title="info"><svg><use href="#i-info"/></svg></button>
   </header>
 
@@ -69,9 +69,9 @@
     <!-- ================================================================ Bearbeitung -->
     <section class="pane" data-pane="Bearbeitung" hidden>
       <div class="toolbar">
-        <button type="button" class="btnPreviewUpdate primary" data-i18n="btn.refresh_preview">⟳ Vorschau aktualisieren</button>
+        <button type="button" class="btnPreviewUpdate primary" data-i18n="btn.refresh_preview">Aktualisieren</button>
       </div>
-      <fieldset><legend data-i18n="label.preset">Vorlage</legend>
+      <fieldset><legend data-i18n="label.preset_feeds">Vorlage Schnittwerte</legend>
         <div class="row"><select id="pSel"></select><button id="pLoad" data-i18n="btn.load">laden</button></div>
         <div class="row"><input id="pName" type="text" placeholder="Name der neuen Vorlage" data-i18n-placeholder="label.preset_name"><button id="pSave" data-i18n="btn.save">speichern</button></div>
       </fieldset>
@@ -84,7 +84,7 @@
     <!-- ================================================================ Stege -->
     <section class="pane" data-pane="Stege" hidden>
       <div class="toolbar">
-        <button type="button" class="btnPreviewUpdate primary" data-i18n="btn.refresh_preview">⟳ Vorschau aktualisieren</button>
+        <button type="button" class="btnPreviewUpdate primary" data-i18n="btn.refresh_preview">Aktualisieren</button>
       </div>
       <div id="grp_stege"></div>
     </section>
@@ -92,7 +92,7 @@
     <!-- ================================================================ Vorschau -->
     <section class="pane" data-pane="Vorschau" hidden>
       <div class="toolbar">
-        <button type="button" class="btnPreviewUpdate primary" data-i18n="btn.refresh_preview">⟳ Vorschau aktualisieren</button>
+        <button type="button" class="btnPreviewUpdate primary" data-i18n="btn.refresh_preview">Aktualisieren</button>
         <label class="inl"><span data-i18n="label.sheet">Rohteil</span> <select id="selSheet"></select></label>
         <button id="btnPrev" title="vorheriges Rohteil">◀</button><button id="btnNext" title="nächstes Rohteil">▶</button>
         <button id="btnFit" title="Ganze Platte zeigen (oder Doppelklick auf leere Fläche)">⤢ Alles</button>
