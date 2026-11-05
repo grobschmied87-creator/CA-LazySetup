@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CA LazySetup</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../ca_core/web/ca_core.css">
+</head>
+<body class="light">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-plate" viewBox="0 0 16 16"><rect x="1.5" y="3" width="13" height="10" rx="1.5"/><path d="M4 6h3v4H4zM9 6h3v2H9z"/></symbol>
+      <symbol id="i-tool" viewBox="0 0 16 16"><path d="M6 1.5h4v3H6zM7 4.5h2v6l-1 4-1-4z"/><path d="M7 7l2-1M7 9l2-1"/></symbol>
+      <symbol id="i-cut" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="1.5" stroke-dasharray="2 1.5"/><path d="M5 11l6-6M9 5h2v2"/></symbol>
+      <symbol id="i-tabs" viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="9" rx="1"/><path d="M6 2v3M10 2v3M6 11v3M10 11v3"/></symbol>
+      <symbol id="i-view" viewBox="0 0 16 16"><path d="M1 8s2.6-4.5 7-4.5S15 8 15 8s-2.6 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2.2"/></symbol>
+      <symbol id="i-res" viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="1.5"/><path d="M4.5 8.2l2.4 2.4 4.6-5"/></symbol>
+      <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M8 7v4.5M8 4.6v.4"/></symbol>
+    </defs>
+  </svg>
+
+  <header id="hdr">
+    <img id="logo" src="img/logo_light.svg" alt="CA LazySetup">
+    <div id="appname"><b>CA LazySetup</b> <span id="ver" class="muted">v2.0.8</span></div>
+    <button id="btnInfo" class="icon" title="Info, Lizenz, Diagnose" data-i18n-title="info"><svg><use href="#i-info"/></svg></button>
+  </header>
+
+  <nav id="tabs" role="tablist">
+    <button data-tab="Rohteile" class="tab"><svg><use href="#i-plate"/></svg><span>Rohteile</span></button>
+    <button data-tab="Werkzeug" class="tab"><svg><use href="#i-tool"/></svg><span>Werkzeug</span></button>
+    <button data-tab="Bearbeitung" class="tab"><svg><use href="#i-cut"/></svg><span>Bearbeitung</span></button>
+    <button data-tab="Stege" class="tab"><svg><use href="#i-tabs"/></svg><span>Stege</span></button>
+    <button data-tab="Vorschau" class="tab"><svg><use href="#i-view"/></svg><span>Vorschau</span></button>
+    <button data-tab="Ergebnis" class="tab"><svg><use href="#i-res"/></svg><span>Ergebnis</span></button>
+  </nav>
+  <div id="statusbar"><div id="status" data-i18n="waiting">Warte auf Daten aus Fusion …</div></div>
+  <div id="notice" hidden></div>
+
+  <main id="content">
+    <!-- ================================================================ Rohteile -->
+    <section class="pane" data-pane="Rohteile">
+      <div class="toolbar">
+        <button id="btnRefresh" data-i18n="btn.refresh" title="Rohteile, Teile, Projektdaten und Skizzen neu aus der Konstruktion lesen">⟳ Aktualisieren</button>
+        <button id="btnAll" data-i18n="btn.all">alle</button><button id="btnNone" data-i18n="btn.none">keine</button>
+      </div>
+      <div id="sheetsEmpty" class="empty muted" hidden><span data-i18n="label.sheets_empty">Keine Rohteile von CA LazyNest / ContourNest in dieser Konstruktion.</span><br>
+        <span data-i18n="label.sheets_hint">Zuerst in CA LazyNest nesten und „Übernehmen“.</span></div>
+      <table id="sheetTable" class="list"><thead><tr><th></th><th data-i18n="label.sheet">Rohteil</th><th data-i18n="label.parts">Teile</th><th data-i18n="label.measure">Maß / Ausrichtung / Nullpunkt</th></tr></thead>
+        <tbody id="sheetBody"></tbody></table>
+      <div id="hints"></div>
+    </section>
+
+    <!-- ================================================================ Werkzeug -->
+    <section class="pane" data-pane="Werkzeug" hidden>
+      <fieldset><legend data-i18n="tab_tool">Werkzeug</legend>
+        <label><span data-i18n="tool_library">Werkzeugbibliothek</span><select id="tLib"></select></label>
+        <label><span data-i18n="tool">Werkzeug</span><select id="tTool"></select></label>
+        <div class="row2">
+          <label><span data-i18n="label.tool_nr">Werkzeugnummer (0 = Auswahl oben)</span><input id="tTnr" type="number" min="0" max="9999" step="1"></label>
+          <label><span data-i18n="label.tool_d">Ø ohne Werkzeug (mm, nur Planung)</span><input id="tD" type="number" min="1" max="40" step="0.5"></label>
+        </div>
+        <label class="check"><input id="tBib" type="checkbox"> <span data-i18n="label.fusion_bib">Fusion-Bibliothek in der Liste einbeziehen</span></label>
+        <div class="okbox" id="tInfo">–</div>
+        <p id="tNoCam" class="warnbox" hidden data-i18n="label.no_cam">Werkzeuge noch nicht lesbar – Arbeitsbereich FERTIGUNG einmal öffnen, dann „⟳ Aktualisieren“ (Register Rohteile).</p>
+      </fieldset>
+    </section>
+
+    <!-- ================================================================ Bearbeitung -->
+    <section class="pane" data-pane="Bearbeitung" hidden>
+      <div class="toolbar">
+        <button type="button" class="btnPreviewUpdate primary" data-i18n="btn.refresh_preview">⟳ Vorschau aktualisieren</button>
+      </div>
+      <fieldset><legend data-i18n="label.preset">Vorlage</legend>
+        <div class="row"><select id="pSel"></select><button id="pLoad" data-i18n="btn.load">laden</button></div>
+        <div class="row"><input id="pName" type="text" placeholder="Name der neuen Vorlage" data-i18n-placeholder="label.preset_name"><button id="pSave" data-i18n="btn.save">speichern</button></div>
+      </fieldset>
+      <div id="grp_schnitt_vor"></div>
+      <div id="grp_schnitt_final"></div>
+      <div id="grp_reihe"></div>
+      <div id="grp_ausgabe"></div>
+    </section>
+
+    <!-- ================================================================ Stege -->
+    <section class="pane" data-pane="Stege" hidden>
+      <div class="toolbar">
+        <button type="button" class="btnPreviewUpdate primary" data-i18n="btn.refresh_preview">⟳ Vorschau aktualisieren</button>
+      </div>
+      <div id="grp_stege"></div>
+    </section>
+
+    <!-- ================================================================ Vorschau -->
+    <section class="pane" data-pane="Vorschau" hidden>
+      <div class="toolbar">
+        <button type="button" class="btnPreviewUpdate primary" data-i18n="btn.refresh_preview">⟳ Vorschau aktualisieren</button>
+        <label class="inl"><span data-i18n="label.sheet">Rohteil</span> <select id="selSheet"></select></label>
+        <button id="btnPrev" title="vorheriges Rohteil">◀</button><button id="btnNext" title="nächstes Rohteil">▶</button>
+        <button id="btnFit" title="Ganze Platte zeigen (oder Doppelklick auf leere Fläche)">⤢ Alles</button>
+        <button id="btnResetPart" title="Bearbeitungen des zuletzt angeklickten Teils verwerfen">↺ Teil</button>
+        <button id="btnResetAll" class="danger" title="Alle Bearbeitungen dieses Rohteils verwerfen">↺ Alle zurücksetzen</button>
+      </div>
+      <div id="sheetLabel"></div>
+      <div id="view"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div id="legend" class="legendstrip">
+        <span><i class="sw tab"></i><span data-i18n="label.legend_tab">Steg</span></span><span><i class="sw tabm"></i><span data-i18n="label.legend_tabm">Steg von Hand</span></span>
+        <span><i class="sw bridge"></i><span data-i18n="label.legend_bridge">Brücke</span></span><span><i class="sw start"></i><span data-i18n="label.legend_start">Start / Anfahrrichtung</span></span>
+        <span><i class="sw edited"></i><span data-i18n="label.legend_edited">Teil bearbeitet</span></span><span><i class="sw zero"></i><span data-i18n="label.legend_zero">Nullpunkt (X rot / Y grün)</span></span>
+        <span class="muted" data-i18n="label.legend_order">Nummer = Schnittfolge (▲▼ in der Liste)</span><span><i class="sw start"></i><span data-i18n="label.legend_start_in">Start Innen (orange)</span></span>
+      </div>
+      <p class="hint" data-i18n="label.preview_hint">Klick auf Kontur: Steg setzen · Klick auf Steg: löschen · Steg ziehen: verschieben</p>
+      <div id="msgs"></div>
+      <details id="rowsBox" open><summary data-i18n="label.rows">Reihenfolge, Stege, Hinweise</summary><div id="rows"></div></details>
+    </section>
+
+    <!-- ================================================================ Ergebnis -->
+    <section class="pane" data-pane="Ergebnis" hidden>
+      <div id="resEmpty" class="empty muted">Noch nichts erstellt – „▶ Operationen erstellen“ unten.</div>
+      <div id="resBox" hidden>
+        <div id="resHead"></div>
+        <ul id="resLines"></ul>
+        <fieldset id="resWarnBox"><legend>Hinweise</legend><ul id="resWarn"></ul></fieldset>
+        <p class="muted">Protokoll: <span id="resLog"></span></p>
+      </div>
+      <div class="row"><button id="btnLog">📄 Protokoll öffnen</button><span id="logPath" class="muted path"></span></div>
+      <div class="row"><button id="btnSilDiag" title="Flächendaten je Teil (gewählte Rohteile) als JSON in den Protokollordner – nur lesen">🔍 Diagnose-Silhouette</button><span id="silDiagPath" class="muted path"></span></div>
+    </section>
+  </main>
+
+  <footer id="bottombar">
+    <span id="selInfo" class="muted"></span>
+    <button id="btnClose" title="Fenster schließen (Einstellungen und Bearbeitungen bleiben gespeichert)">Schließen</button>
+    <button id="btnRun" class="primary" title="2D-Kontur-Operationen für die gewählten Rohteile in FERTIGUNG anlegen" data-i18n="run_ops">▶ Operationen erstellen</button>
+  </footer>
+
+  <script src="../ca_core/web/ca_i18n.js"></script>
+  <script src="../ca_core/web/ca_shell.js"></script>
+  <script src="fs_logic.js"></script>
+  <script src="main.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>

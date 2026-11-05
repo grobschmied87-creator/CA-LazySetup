@@ -1,0 +1,13 @@
+{
+    "autodeskProduct": "Fusion360",
+    "type": "addin",
+    "id": "C0359D76-6985-4019-B1DC-0726FEB45ED1",
+    "author": "Chris Adam Modellbau",
+    "description": {
+        "": "CA LazySetup v2.0.8 (vormals Finalschnitt) – Fertigschnitt für CA-LazyNest-/ContourNest-Rohteile in EINEM Fenster: 2D-Kontur-Operationen je Rohteil immer an der SILHOUETTE (Draufsicht; nur echte Durchbrüche) (Rohteilmaß, Ausrichtung und Nullpunkt aus dem Nesting-Projekt, Durchbrüche zuerst, Reihenfolge nach größter Restfläche fürs Vakuum, Startpunkt zur Restfläche, Halte- und Brückenstege per Klick bearbeiten). Basis-CAM, ohne Manufacturing Extension."
+    },
+    "version": "2.0.8",
+    "runOnStartup": false,
+    "supportedOS": "windows|mac",
+    "editEnabled": true
+}
