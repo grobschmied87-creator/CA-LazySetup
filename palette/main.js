@@ -87,7 +87,7 @@
       var grid = el('div', { className: 'fgrid' }, fs);
       fields.filter(function (f) { return f.group === g[0]; }).forEach(function (f) {
         if (f.kind === 'h') {
-          el('div', { className: 'fsub' }, grid, f.label);
+          el('div', { className: 'fsub', id: 'f_' + f.key }, grid, f.label);
           return;
         }
         var id = 'f_' + f.key, inp;
@@ -96,21 +96,28 @@
           inp = el('input', { id: id, type: 'checkbox' }, lb); lb.appendChild(document.createTextNode(' ' + f.label));
         } else {
           var l2 = el('label', {}, grid, f.label);
-          if (f.kind === 'd') {
+          if (f.kind === 'd' || f.kind === 's') {
             inp = el('select', { id: id }, l2);
-            f.options.forEach(function (o) { el('option', { value: o[0] }, inp, o[1]); });
+            if (f.widget) inp.setAttribute('data-widget', f.widget);
+            (f.options || []).forEach(function (o) { el('option', { value: o[0] }, inp, o[1]); });
           } else {
             inp = el('input', { id: id, type: 'number', min: f.min, max: f.max, step: f.step }, l2);
           }
         }
         // Zahlen nur über „Aktualisieren“; Checkbox/Select sofort
-        if (f.kind === 'b' || f.kind === 'd') {
-          inp.addEventListener('change', changed);
+        if (f.kind === 'b' || f.kind === 'd' || f.kind === 's') {
+          inp.addEventListener('change', function (ev) {
+            if (f.widget === 'tool') fillPresets(f.key.indexOf('_final') >= 0 ? 'final' : 'vor');
+            if (f.widget === 'cam_template') syncTemplateUi();
+            changed(ev);
+          });
         } else {
           inp.addEventListener('change', markDirty);
           inp.addEventListener('input', markDirty);
         }
       });
+      fillMachiningSelects();
+      syncTemplateUi();
     });
   }
   function fillCfg(cfg) {
@@ -121,6 +128,8 @@
       if (f.kind === 'b') i.checked = !!S.cfg[f.key]; else i.value = S.cfg[f.key];
     });
     if (S.cfg.tool_d !== undefined) $('tD').value = S.cfg.tool_d;
+    if (typeof fillMachiningSelects === 'function') fillMachiningSelects();
+    if (typeof syncTemplateUi === 'function') syncTemplateUi();
   }
   function collectCfg() {
     var c = {};
@@ -128,7 +137,7 @@
       if (f.kind === 'h') return;
       var i = $('f_' + f.key); if (!i) return;
       if (f.kind === 'b') c[f.key] = i.checked;
-      else if (f.kind === 'd') c[f.key] = i.value;
+      else if (f.kind === 'd' || f.kind === 's') c[f.key] = i.value;
       else { var v = parseFloat(String(i.value).replace(',', '.')); if (!isNaN(v)) c[f.key] = v; }
     });
     var d = parseFloat($('tD').value); if (!isNaN(d)) c.tool_d = d;
@@ -205,6 +214,81 @@
     $('tInfo').textContent = (t.selected && !t.label ? 'Automatisch: ' + t.selected + ' – ' : (t.selected ? t.selected + ' – ' : '')) + t.text;
     $('tNoCam').hidden = !!t.available;
     void want;
+    fillMachiningSelects();
+    syncTemplateUi();
+  }
+
+  function tI18n(key, fallback) {
+    return (window.CA_I18n && CA_I18n.t(key)) || fallback;
+  }
+  function toolItems() {
+    var t = S.tools || {};
+    if (t.items && t.items.length) return t.items;
+    return (t.list || []).map(function (lbl) { return { label: lbl, cut_presets: [] }; });
+  }
+  function fillSelect(sel, opts, want, emptyLabel) {
+    if (!sel) return;
+    sel.innerHTML = '';
+    (opts || []).forEach(function (o) { el('option', { value: o[0] }, sel, o[1]); });
+    if (want !== undefined && want !== null && want !== '') {
+      sel.value = want;
+      if (sel.value !== String(want) && want) el('option', { value: want }, sel, want);
+      sel.value = want;
+    }
+    if (!sel.options.length && emptyLabel) el('option', { value: '' }, sel, emptyLabel);
+  }
+  function fillPresets(suf) {
+    var ts = $('f_tool_label_' + suf), ps = $('f_cut_preset_' + suf);
+    if (!ps) return;
+    var label = ts ? ts.value : '';
+    var item = toolItems().filter(function (x) { return x.label === label; })[0];
+    var presets = (item && item.cut_presets) || [];
+    var want = (S.cfg && S.cfg['cut_preset_' + suf]) || (ps.value || '');
+    var opts = presets.length ? presets.map(function (pr) { return [pr.name, pr.name]; })
+      : [['', tI18n('label.cut_presets_empty', '– keine Schnittdaten hinterlegt –')]];
+    fillSelect(ps, opts, presets.length ? want : '', null);
+  }
+  function fillMachiningSelects() {
+    var items = toolItems();
+    var templates = (S.session && S.session.templates) || S.templates || [];
+    ['vor', 'final'].forEach(function (suf) {
+      var ts = $('f_tool_label_' + suf);
+      if (ts) {
+        var want = ts.value || (S.cfg && S.cfg['tool_label_' + suf]) || '';
+        var opts = [['', tI18n('label.tool_from_tab', '– wie Register Werkzeug –')]];
+        items.forEach(function (it) { opts.push([it.label, it.label]); });
+        fillSelect(ts, opts, want);
+      }
+      fillPresets(suf);
+      var cs = $('f_cam_template_' + suf);
+      if (cs) {
+        var twant = cs.value || (S.cfg && S.cfg['cam_template_' + suf]) || '';
+        var topts = [['', tI18n('label.template_none', '– ohne Vorlage –')]];
+        if (!templates.length) topts = [['', tI18n('label.templates_empty', '– keine CAM-Vorlagen (Lokal/Cloud) –')]];
+        else templates.forEach(function (tm) { topts.push([tm.id, tm.label || tm.name || tm.id]); });
+        fillSelect(cs, topts, templates.length ? twant : '');
+      }
+    });
+  }
+  function fieldRow(key) {
+    var n = $('f_' + key);
+    if (!n) return null;
+    if (n.classList && n.classList.contains('fsub')) return n;
+    return n.closest('label') || n.parentNode;
+  }
+  function syncTemplateUi() {
+    var hide = {
+      vor: ['hdr_anfahr_vor', 'anfahr_art_vor', 'rampenwinkel_vor', 'rampenlaenge_vor', 'bogenradius_vor', 'einfahrt_pct_vor', 'hdr_schnitt_vor', 'az_vor'],
+      final: ['hdr_anfahr_final', 'anfahr_art_final', 'rampenwinkel_final', 'rampenlaenge_final', 'bogenradius_final', 'einfahrt_pct_final', 'hdr_schnitt_final', 'az_final']
+    };
+    ['vor', 'final'].forEach(function (suf) {
+      var sel = $('f_cam_template_' + suf);
+      var on = !!(sel && sel.value);
+      (hide[suf] || []).forEach(function (k) {
+        var row = fieldRow(k);
+        if (row) row.hidden = on;
+      });
+    });
   }
 
   // ---------------------------------------------------------------- Vorschau
@@ -286,9 +370,11 @@
     $('ver').textContent = 'v' + s.version;
     if (!S.fields.length || S.fields.length !== s.fields.length) buildFields(s.fields, s.groups);
     fillCfg(s.cfg);
+    S.templates = s.templates || [];
     var ps = $('pSel'); ps.innerHTML = ''; (s.presets || []).forEach(function (n) { el('option', { value: n }, ps, n); });
     renderSheets(s.sheets);
     if (s.tools) renderTools(s.tools);
+    else { fillMachiningSelects(); syncTemplateUi(); }
     renderResult(s.result);
     $('logPath').textContent = s.logFile || '';
     var hb = $('hints'); hb.innerHTML = '';

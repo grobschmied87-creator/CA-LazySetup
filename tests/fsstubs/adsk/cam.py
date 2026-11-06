@@ -39,3 +39,19 @@ class CAMManager:
     @staticmethod
     def get():
         return _MgrHolder(CAMManager._lm)
+
+
+class AutomaticGenerationModes:
+    ForceGeneration = 0
+    SkipGeneration = 1
+    UserPreference = 2
+
+
+class CreateFromCAMTemplateInput:
+    def __init__(self):
+        self.camTemplate = None
+        self.mode = AutomaticGenerationModes.SkipGeneration
+
+    @staticmethod
+    def create():
+        return CreateFromCAMTemplateInput()

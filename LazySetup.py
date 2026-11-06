@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""CA LazySetup 2.0.9 (vormals Finalschnitt 1.3.1) – Fertigschnitt (2D-Kontur) für CA-LazyNest-/ContourNest-Rohteile.
+"""CA LazySetup 2.0.10 (vormals Finalschnitt 1.3.1) – Fertigschnitt (2D-Kontur) für CA-LazyNest-/ContourNest-Rohteile.
 
 EIN Fenster (Palette, wie CA LazyNest): Kopf mit Logo, Register Rohteile / Werkzeug / Bearbeitung / Stege / Vorschau /
 Ergebnis, Infobox (Lizenz, Diagnose), hell/dunkel nach Fusion-Farbschema. In der Vorschau werden Halte-/Brückenstege
@@ -25,7 +25,6 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import fs_log as L          # noqa: E402
 import fs_geom as G
-from ca_core import ca_i18n         # noqa: E402
 import fs_fusion as F       # noqa: E402
 import fs_cam as C          # noqa: E402
 import fs_run as R          # noqa: E402
@@ -48,13 +47,14 @@ def _load_core(alias):
 
 
 CORE = _load_core('lazysetup_ca_core')
+ca_i18n = CORE.ca_i18n
 TH = CORE.ca_theme
 REFS = CORE.ca_refs
 DIAG = CORE.ca_diag
 PRODUCT = 'lazysetup'
 
-VERSION = '2.0.9'               # EINZIGE Versionsquelle (Manifest-Text, Tooltip, Protokoll, Operations-Attribut)
-BUILD_DATE = '2026-11-05'
+VERSION = '2.0.10'               # EINZIGE Versionsquelle (Manifest-Text, Tooltip, Protokoll, Operations-Attribut)
+BUILD_DATE = '2026-11-06'
 APP_NAME = 'CA LazySetup'
 L.VERSION = VERSION
 R.REFS = REFS                   # Prüfung veralteter Verknüpfungen vor computeAll (fs_run.compute_ok)
@@ -107,18 +107,17 @@ FIELDS = (
     ('richtung_vor', 'd', 'Fräsrichtung', 'schnitt_vor', RICHTUNG),
     ('vorfraes_rest_mm', 'f', 'Bodentiefe / Rest zum Fertig (mm)', 'schnitt_vor', (0.1, 20.0, 0.1)),
     ('vorfraes_aufmass', 'f', 'Seitliches Aufmaß (mm)', 'schnitt_vor', (0.0, 5.0, 0.1)),
+    ('tool_label_vor', 's', 'Werkzeug', 'schnitt_vor', 'tool'),
+    ('cut_preset_vor', 's', 'Schnittdaten', 'schnitt_vor', 'cut_preset'),
+    ('cam_template_vor', 's', 'CAM-Vorlage', 'schnitt_vor', 'cam_template'),
     ('hdr_anfahr_vor', 'h', 'Anfahren / Einfahren', 'schnitt_vor', None),
     ('anfahr_art_vor', 'd', 'Anfahrart', 'schnitt_vor', ANFAHR),
     ('rampenwinkel_vor', 'f', 'Rampenwinkel (°)', 'schnitt_vor', (0.5, 45.0, 0.5)),
     ('rampenlaenge_vor', 'f', 'Rampenlänge / Abstand (mm)', 'schnitt_vor', (0.5, 200.0, 1.0)),
     ('bogenradius_vor', 'f', 'Bogenradius (mm)', 'schnitt_vor', (0.5, 100.0, 0.5)),
     ('einfahrt_pct_vor', 'f', 'Einfahrvorschub (%)', 'schnitt_vor', (5.0, 100.0, 5.0)),
-    ('hdr_schnitt_vor', 'h', 'Schnittwerte', 'schnitt_vor', None),
+    ('hdr_schnitt_vor', 'h', 'Zustellung', 'schnitt_vor', None),
     ('az_vor', 'f', 'Zustellung az (mm)', 'schnitt_vor', (0.1, 60.0, 0.5)),
-    ('vc_vor', 'f', 'Schnittgeschwindigkeit vc (m/min)', 'schnitt_vor', (1.0, 5000.0, 10.0)),
-    ('fz_vor', 'f', 'Zahnvorschub fz (mm)', 'schnitt_vor', (0.001, 5.0, 0.01)),
-    ('spindle_vor', 'f', 'Spindel (U/min)', 'schnitt_vor', (100.0, 60000.0, 100.0)),
-    ('vf_vor', 'f', 'Vorschub vf (mm/min)', 'schnitt_vor', (1.0, 20000.0, 10.0)),
     ('durchstich', 'f', 'Durchstich (mm)', 'schnitt_vor', (0.0, 5.0, 0.1)),
     ('innen_zuerst', 'b', 'Innenkonturen zuerst', 'schnitt_vor', None),
     ('taschen', 'b', 'Taschen einbeziehen (2D-Tasche)', 'schnitt_vor', None),
@@ -128,18 +127,17 @@ FIELDS = (
     ('richtung_final', 'd', 'Fräsrichtung', 'schnitt_final', RICHTUNG),
     ('schlicht_zugabe', 'f', 'Schlichtzugabe radial (mm)', 'schnitt_final', (0.0, 3.0, 0.1)),
     ('schlichtgang', 'b', 'Schlichtgang (2. Umlauf ohne Aufmaß)', 'schnitt_final', None),
+    ('tool_label_final', 's', 'Werkzeug', 'schnitt_final', 'tool'),
+    ('cut_preset_final', 's', 'Schnittdaten', 'schnitt_final', 'cut_preset'),
+    ('cam_template_final', 's', 'CAM-Vorlage', 'schnitt_final', 'cam_template'),
     ('hdr_anfahr_final', 'h', 'Anfahren / Einfahren', 'schnitt_final', None),
     ('anfahr_art_final', 'd', 'Anfahrart', 'schnitt_final', ANFAHR),
     ('rampenwinkel_final', 'f', 'Rampenwinkel (°)', 'schnitt_final', (0.5, 45.0, 0.5)),
     ('rampenlaenge_final', 'f', 'Rampenlänge / Abstand (mm)', 'schnitt_final', (0.5, 200.0, 1.0)),
     ('bogenradius_final', 'f', 'Bogenradius (mm)', 'schnitt_final', (0.5, 100.0, 0.5)),
     ('einfahrt_pct_final', 'f', 'Einfahrvorschub (%)', 'schnitt_final', (5.0, 100.0, 5.0)),
-    ('hdr_schnitt_final', 'h', 'Schnittwerte', 'schnitt_final', None),
+    ('hdr_schnitt_final', 'h', 'Zustellung', 'schnitt_final', None),
     ('az_final', 'f', 'Zustellung az (mm)', 'schnitt_final', (0.1, 60.0, 0.5)),
-    ('vc_final', 'f', 'Schnittgeschwindigkeit vc (m/min)', 'schnitt_final', (1.0, 5000.0, 10.0)),
-    ('fz_final', 'f', 'Zahnvorschub fz (mm)', 'schnitt_final', (0.001, 5.0, 0.01)),
-    ('spindle_final', 'f', 'Spindel (U/min)', 'schnitt_final', (100.0, 60000.0, 100.0)),
-    ('vf_final', 'f', 'Vorschub vf (mm/min)', 'schnitt_final', (1.0, 20000.0, 10.0)),
     ('hdr_stege_final', 'h', 'Stege', 'schnitt_final', None),
     ('stege_final', 'b', 'Haltestege', 'schnitt_final', None),
     ('bruecken_final', 'b', 'Brückenstege', 'schnitt_final', None),
@@ -274,8 +272,10 @@ def clean_cfg(raw, base=None):
                 x = float(str(v).replace(',', '.'))
                 x = min(max(x, lo), hi)
                 cfg[key] = int(round(x)) if kind == 'i' else x
-            elif kind == 'd' and v in [a for a, _b in extra]:
+            elif kind == 'd' and extra and v in [a for a, _b in extra]:
                 cfg[key] = v
+            elif kind == 's':
+                cfg[key] = '' if v is None else str(v).strip()
         except (TypeError, ValueError):
             L.warn('Eingabe %s: %r ungültig – %r bleibt', key, v, cfg.get(key))
     if 'tool_d' in raw:
@@ -346,6 +346,8 @@ def fields_payload(lang=None):
             f['min'], f['max'], f['step'] = extra
         elif kind == 'd':
             f['options'] = [[a, ca_i18n.opt_label(key, a, b, lang)] for a, b in extra]
+        elif kind == 's':
+            f['widget'] = extra
         out.append(f)
     return out
 
@@ -529,7 +531,11 @@ def _tools_payload():
     for i in lib_ids:
         if i not in seen:
             seen.add(i); lib_ids_u.append(i)
-    return {'list': [t['label'] for t in tools], 'selected': te['label'] if te else '',
+    items = []
+    for t in tools:
+        items.append({'label': t['label'], 'cut_presets': C.cut_presets_of(t.get('tool'))})
+    return {'list': [t['label'] for t in tools], 'items': items,
+            'selected': te['label'] if te else '',
             'label': _state.get('tool_label') or '', 'tnr': int(_state.get('tnr') or 0),
             'fusionBib': bool(_state.get('fusion_bib')), 'text': _tool_text(te, _plan_cfg()),
             'available': _state.get('tools') is not None,
@@ -537,6 +543,25 @@ def _tools_payload():
                            'label': x if isinstance(x, str) else x.get('label') or x['id']}
                           for x in (libs if libs else [{'id': 'Dokument', 'label': 'Dokument'}])],
             'library': _state.get('tool_library') or 'Dokument'}
+
+
+def _templates_payload(refresh=False):
+    """CAM-Vorlagen Lokal+Cloud; Cache bis Aktualisieren."""
+    if refresh or _state.get('templates') is None:
+        try:
+            _state['templates'] = C.list_templates()
+        except Exception:
+            L.exc('CAM-Vorlagen listen')
+            _state['templates'] = []
+    return list(_state.get('templates') or [])
+
+
+def _pass_tool_entry(label):
+    """Werkzeug eines Vorfräs-/Fertig-Blocks (Label); None wenn leer/unbekannt."""
+    label = (label or '').strip()
+    if not label:
+        return None
+    return tool_entry(_state.get('tools'), label, 0, float((_state.get('cfg') or G.DEFAULTS)['tool_d']))
 
 
 def _license_status():
@@ -587,7 +612,8 @@ def _session():
     return {'version': VERSION, 'buildDate': BUILD_DATE, 'theme': _theme(), 'design': bool(design),
             'fields': fields_payload(), 'groups': groups_payload(), 'cfg': cfg,
             'toolD': cfg.get('tool_d'), 'presets': sorted(presets().keys()), 'sheets': _sheets_payload(),
-            'tools': _tools_payload(), 'plan': _plan_payload() if _sel_sheets() else None,
+            'tools': _tools_payload(), 'templates': _templates_payload(),
+            'plan': _plan_payload() if _sel_sheets() else None,
             'result': _state.get('result'), 'license': lic,
             'info': DIAG.info_payload(PRODUCT, APP_NAME, VERSION, BUILD_DATE, lic),
             'logDir': L.LOG_DIR, 'logFile': L.LOG_FILE, 'migration': _state.get('migration'),
@@ -731,6 +757,7 @@ def handle(act, d):
         _read_design('Aktualisieren')
         if _state.get('tools') is None:
             _load_tools(_state.get('fusion_bib'))
+        _state['templates'] = None
         return _session()
     if act == 'presetLoad':
         p = presets().get(d.get('name'))
@@ -761,11 +788,15 @@ def handle(act, d):
             return {'error': 'Kein Rohteil gewählt.'}
         cfg = _state['cfg'] or initial_cfg()[0]
         te = _current_tool()
+        packed = dict(te) if te else {'tool': None, 'label': '', 'info': {}}
+        packed['vor'] = _pass_tool_entry(cfg.get('tool_label_vor')) or te
+        packed['final'] = _pass_tool_entry(cfg.get('tool_label_final')) or te
         _save_settings()
         names = [s['name'] for s in _sel_sheets()]
-        _state['pending'] = {'cfg': cfg, 'tool': te, 'names': names}
-        L.info('Ausführen: Rohteile %s, Werkzeug %s, cfg %s', names, te['label'] if te else '-',
-               json.dumps(cfg, ensure_ascii=True))
+        _state['pending'] = {'cfg': cfg, 'tool': packed, 'names': names}
+        L.info('Ausführen: Rohteile %s, Werkzeug %s / Vor %s / Fertig %s, cfg %s', names,
+               (te or {}).get('label') or '-', (packed.get('vor') or {}).get('label') or '-',
+               (packed.get('final') or {}).get('label') or '-', json.dumps(cfg, ensure_ascii=True))
         _fire(EV_RUN)
         return {'ok': True}
     if act == 'license':

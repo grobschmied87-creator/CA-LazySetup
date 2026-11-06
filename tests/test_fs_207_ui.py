@@ -16,7 +16,7 @@ from ca_core import ca_i18n
 class TestVersion(unittest.TestCase):
     def test_version(self):
         import LazySetup as LS
-        self.assertEqual(LS.VERSION, '2.0.9')
+        self.assertEqual(LS.VERSION, '2.0.10')
 
 
 class TestDualSchnittFields(unittest.TestCase):
@@ -31,8 +31,12 @@ class TestDualSchnittFields(unittest.TestCase):
         import LazySetup as LS
         keys = [f[0] for f in LS.FIELDS]
         for k in ('richtung_vor', 'richtung_final', 'stege_final', 'bruecken_final',
-                  'anfahr_art_vor', 'anfahr_art_final', 'az_vor', 'az_final', 'vf_vor', 'vf_final'):
+                  'anfahr_art_vor', 'anfahr_art_final', 'az_vor', 'az_final',
+                  'tool_label_vor', 'cut_preset_vor', 'cam_template_vor',
+                  'tool_label_final', 'cut_preset_final', 'cam_template_final'):
             self.assertIn(k, keys)
+        for k in ('vc_vor', 'vf_vor', 'spindle_vor', 'fz_vor', 'vc_final', 'vf_final'):
+            self.assertNotIn(k, keys)
         for k in ('stege_vor', 'steg_form_vor', 'bruecken_vor', 'steg_breite_vor', 'zustellung'):
             self.assertNotIn(k, keys)
         self.assertNotIn('richtung', keys)
@@ -93,7 +97,7 @@ class TestMainJsPolicy(unittest.TestCase):
         js = open(os.path.join(HERE, 'palette', 'main.js'), encoding='utf-8').read()
         self.assertIn('btnPreviewUpdate', js)
         self.assertIn('markDirty', js)
-        self.assertIn("f.kind === 'b' || f.kind === 'd'", js)
+        self.assertIn("f.kind === 'b' || f.kind === 'd' || f.kind === 's'", js)
         self.assertIn("f.kind === 'h'", js)
 
     def test_html_hosts(self):

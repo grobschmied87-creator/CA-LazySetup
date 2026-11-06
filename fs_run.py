@@ -329,6 +329,11 @@ def run(app, ui, design, cfg, names=None, tool_entry=None, version='', ask_setup
             res['lines'].append('CAM-API nicht verfügbar.')
             return res
         tool = tool_entry['tool'] if tool_entry else None
+        pass_tools = {
+            'default': tool,
+            'vor': ((tool_entry or {}).get('vor') or {}).get('tool') or tool,
+            'final': ((tool_entry or {}).get('final') or {}).get('tool') or tool,
+        }
         L.info('Planung: Werkzeug-Ø %g mm, cfg-Hash %s', cfg['tool_d'], cfg_hash(cfg))
         if tool is None:
             res['warnings'].append('Kein Werkzeug gewählt – Operationen ohne Werkzeug (in Fusion nachtragen).')
@@ -348,7 +353,8 @@ def run(app, ui, design, cfg, names=None, tool_entry=None, version='', ask_setup
         if not sheets:
             res['lines'].append('Keine ContourNest-Rohteile gefunden (Attribut ContourNest/sheet).')
             return res
-        state = {'dumped': {}, 'warnings': res['warnings'], 'param_issues': set(), 'context': set()}
+        state = {'dumped': {}, 'warnings': res['warnings'], 'param_issues': set(), 'context': set(),
+                 'pass_tools': pass_tools}
         all_ops = []
         # Phase 1 – nur lesen/planen (keine CAM-Änderung)
         jobs = []

@@ -324,6 +324,293 @@ def tool_by_number(tools, number):
     return None
 
 
+# ---------------------------------------------------------------- Schnittdaten-Presets / CAM-Vorlagen (2.0.10)
+LIST_STRATS = ('contour2d', 'pocket2d', 'adaptive2d', 'face', 'slot')
+_TEMPLATE_INDEX = {}
+
+
+def cut_presets_of(tool):
+    """Schnittdaten-Presets eines Fusion-Werkzeugs (tool.presets) als [{index, name}]."""
+    pres = _safe(lambda: tool.presets) if tool is not None else None
+    n = _safe(lambda: pres.count, 0) or 0
+    out = []
+    for i in range(n):
+        pr = _safe(lambda i=i: pres.item(i))
+        if pr is None:
+            continue
+        name = pr if isinstance(pr, str) else (_safe(lambda: pr.name) or '')
+        if not name:
+            name = 'Schnittdaten %d' % (i + 1)
+        out.append({'index': i, 'name': str(name)})
+    return out
+
+
+def pick_tool_preset(tool, name=None, index=None):
+    """Gewähltes Schnittdaten-Preset (Name oder Index) oder das erste Preset; None wenn keine Presets."""
+    pres = _safe(lambda: tool.presets) if tool is not None else None
+    n = _safe(lambda: pres.count, 0) or 0
+    if n <= 0:
+        return None
+    name = (name or '').strip() if isinstance(name, str) else ''
+    if name:
+        byn = _safe(lambda: pres.itemByName(name))
+        if byn is not None:
+            return byn
+        for i in range(n):
+            pr = _safe(lambda i=i: pres.item(i))
+            pname = pr if isinstance(pr, str) else _safe(lambda: pr.name)
+            if pname == name:
+                return pr
+    if isinstance(index, int) and 0 <= index < n:
+        return _safe(lambda: pres.item(index))
+    return _safe(lambda: pres.item(0))
+
+
+def _url_str(url):
+    if url is None:
+        return ''
+    return _safe(lambda: url.toString() if hasattr(url, 'toString') else str(url)) or str(url)
+
+
+def _template_strategies(tmpl):
+    ops = _safe(lambda: tmpl.operations)
+    n = _safe(lambda: ops.count, 0) or 0
+    out = []
+    for i in range(n):
+        inp = None
+        if ops is not None and hasattr(ops, 'get'):
+            inp = _safe(lambda i=i: ops.get(i))
+        if inp is None:
+            inp = _safe(lambda i=i: ops.item(i) if hasattr(ops, 'item') else None)
+        st = _safe(lambda: inp.strategy) if inp is not None else None
+        if st:
+            out.append(str(st).lower())
+    return out
+
+
+def _template_selectable(tmpl, strats):
+    if _safe(lambda: tmpl.isHoleTemplate):
+        return False
+    valid = _safe(lambda: tmpl.isValidTemplate)
+    if valid is False:
+        return False
+    if not strats:
+        return True
+    return any(s in LIST_STRATS or 'contour' in s for s in strats)
+
+
+def _template_entry(tmpl, parent_url, loc_name, folder, asset_url=''):
+    if tmpl is None or not _template_selectable(tmpl, _template_strategies(tmpl)):
+        return None
+    name = _safe(lambda: tmpl.name) or 'Vorlage'
+    strats = _template_strategies(tmpl)
+    parent = _url_str(parent_url)
+    tid = '%s|%s|%s' % (loc_name, folder, name)
+    label = '%s: %s' % (loc_name, ('%s/%s' % (folder, name)) if folder else name)
+    if strats:
+        label = '%s [%s]' % (label, ','.join(strats))
+    return {'id': tid, 'label': label[:140], 'name': name, 'folder': folder, 'location': loc_name,
+            'url': parent, 'asset_url': asset_url or '', 'strategies': strats,
+            'valid': bool(_safe(lambda: tmpl.isValidTemplate))}
+
+
+def _walk_templates(tl, url, loc_name, folder, out, seen, depth):
+    key = _url_str(url)
+    if not key or key in seen or depth > 6:
+        return
+    seen.add(key)
+    tmpls = _safe(lambda: tl.childTemplates(url))
+    listed = False
+    if tmpls:
+        for t in items(tmpls):
+            info = _template_entry(t, url, loc_name, folder)
+            if info:
+                out.append(info)
+                listed = True
+    if not listed:
+        for u in items(_safe(lambda: tl.childAssetURLs(url))):
+            t = _safe(lambda u=u: tl.templateAtURL(u))
+            info = _template_entry(t, url, loc_name, folder, asset_url=_url_str(u))
+            if info:
+                out.append(info)
+    if depth < 6:
+        for furl in items(_safe(lambda: tl.childFolderURLs(url))):
+            leaf = (_safe(lambda: furl.leafName)
+                    or (_safe(lambda: tl.displayName(furl)) or '')
+                    or _url_str(furl).rstrip('/').split('/')[-1])
+            sub = ('%s/%s' % (folder, leaf)).strip('/') if folder else (leaf or '')
+            _walk_templates(tl, furl, loc_name, sub, out, seen, depth + 1)
+
+
+def list_templates():
+    """CAM-Operationsvorlagen aus Lokal + Cloud (kein Hub). [{id, label, name, folder, location, url, strategies}]."""
+    global _TEMPLATE_INDEX
+    out = []
+    _TEMPLATE_INDEX = {}
+    if adsk.cam is None:
+        return out
+    try:
+        tl = adsk.cam.CAMManager.get().libraryManager.templateLibrary
+    except Exception:
+        L.exc('Vorlagenbibliothek öffnen')
+        return out
+    if tl is None:
+        return out
+    locs = [('Lokal', adsk.cam.LibraryLocations.LocalLibraryLocation),
+            ('Cloud', adsk.cam.LibraryLocations.CloudLibraryLocation)]
+    seen = set()
+    for nm, loc in locs:
+        if loc is None:
+            continue
+        try:
+            base = _safe(lambda: tl.urlByLocation(loc))
+            if base is None:
+                continue
+            _walk_templates(tl, base, nm, '', out, seen, 0)
+        except Exception:
+            L.exc('CAM-Vorlagen %s' % nm)
+    # eindeutige ids
+    used = {}
+    for e in out:
+        k = e['id']
+        if k in used:
+            used[k] += 1
+            e['id'] = '%s#%d' % (k, used[k])
+        else:
+            used[k] = 1
+        _TEMPLATE_INDEX[e['id']] = e
+    L.info('CAM-Vorlagen gefunden: %d (Lokal/Cloud)', len(out))
+    return out
+
+
+def resolve_template(tid):
+    """Vorlage anhand der Listen-ID wiederfinden (Ordner + Name; optional asset_url)."""
+    tid = (tid or '').strip()
+    if not tid:
+        return None
+    info = _TEMPLATE_INDEX.get(tid)
+    if info is None:
+        list_templates()
+        info = _TEMPLATE_INDEX.get(tid)
+    if not info:
+        return None
+    if adsk.cam is None:
+        return None
+    try:
+        tl = adsk.cam.CAMManager.get().libraryManager.templateLibrary
+    except Exception:
+        return None
+    if tl is None:
+        return None
+    if info.get('asset_url'):
+        t = _safe(lambda: tl.templateAtURL(adsk.core.URL.create(info['asset_url'])))
+        if t is not None:
+            return t
+    parent = info.get('url') or ''
+    if parent:
+        url = _safe(lambda: adsk.core.URL.create(parent))
+        tmpls = _safe(lambda: tl.childTemplates(url)) if url is not None else None
+        for t in items(tmpls):
+            if _safe(lambda: t.name) == info.get('name'):
+                return t
+    return None
+
+
+def _template_matches_strategy(strats, strategy):
+    strategy = (strategy or '').lower()
+    if not strats:
+        return True
+    if 'contour' in strategy:
+        return any('contour' in s for s in strats)
+    if 'pocket' in strategy:
+        return any('pocket' in s for s in strats)
+    return strategy in strats
+
+
+def _flatten_created(results):
+    raw = items(results) if not isinstance(results, (list, tuple)) else list(results or [])
+    out, seen = [], set()
+    for obj in raw:
+        if obj is None:
+            continue
+        oid = id(obj)
+        if oid not in seen:
+            seen.add(oid)
+            out.append(obj)
+        children = _safe(lambda: items(obj.allOperations) if hasattr(obj, 'allOperations') else None)
+        if not children:
+            children = _safe(lambda: items(obj.operations) if hasattr(obj, 'operations') else None)
+        for ch in children or []:
+            if ch is None or id(ch) in seen:
+                continue
+            seen.add(id(ch))
+            out.append(ch)
+    return out
+
+
+def _compatible_ops(created, strategy):
+    strategy = (strategy or 'contour2d').lower()
+    ok, extras = [], []
+    for obj in created:
+        st = _safe(lambda: obj.strategy)
+        if not st:
+            extras.append(obj)
+            continue
+        sl = str(st).lower()
+        if 'contour' in strategy and 'contour' in sl:
+            ok.append(obj)
+        elif 'pocket' in strategy and 'pocket' in sl:
+            ok.append(obj)
+        elif sl == strategy:
+            ok.append(obj)
+        else:
+            extras.append(obj)
+    return ok, extras
+
+
+def _delete_created(objs):
+    for o in reversed(list(objs or [])):
+        _safe(lambda o=o: o.deleteMe())
+
+
+def _apply_tool_preset(target, tool, preset_name, rec):
+    """Werkzeug und Preset an OperationInput oder erzeugte Operation – Preset erst nach Tool, nie ungültig."""
+    if tool is None:
+        return
+    _safe(lambda: setattr(target, 'tool', tool))
+    chosen = pick_tool_preset(tool, preset_name)
+    if chosen is None:
+        rec['toolPreset'] = None
+        n = _safe(lambda: tool.presets.count, 0) or 0
+        if n <= 0:
+            rec['preset_warn'] = 'start-values.presets leer'
+        return
+    # nur setzen wenn setattr nicht scheitert – ungültiges Preset nie erzwingen
+    err = []
+    def _set():
+        try:
+            target.toolPreset = chosen
+        except Exception as e:
+            err.append(str(e))
+            raise
+    if _safe(_set) is None and err:
+        rec['toolPreset'] = None
+        rec['preset_warn'] = err[0][:160]
+        return
+    rec['toolPreset'] = _safe(lambda: chosen.name) or preset_name or True
+
+
+def _ops_from(rec, op):
+    xs = rec.get('template_ops')
+    if xs:
+        return list(xs)
+    return [op] if op is not None else []
+
+
+def uses_template(cfg, premill=False):
+    return bool((cfg or {}).get('cam_template' + _suf(premill)))
+
+
 # ---------------------------------------------------------------- Parameter
 def unq(v):
     """Auswahlwert ohne umschließende Hochkommas. Fusion 2705 liefert getChoices()-Werte MIT Hochkommas
@@ -901,14 +1188,55 @@ def delete_old(setup, cam=None, sheet_name=None):
     return n
 
 
-def new_op(setup, strategy, name, tool, meta, rec):
+def new_op(setup, strategy, name, tool, meta, rec, cfg=None, premill=False):
+    """Neue Operation: ohne Vorlage createInput + toolPreset; mit Vorlage createFromCAMTemplate2.
+    cfg/premill wählen cam_template_* und cut_preset_*. Bibliotheks-Vorlage wird nicht zurückgeschrieben."""
+    cfg = cfg or {}
+    suf = _suf(premill)
+    tmpl_id = (cfg.get('cam_template' + suf) or '').strip()
+    preset_name = (cfg.get('cut_preset' + suf) or '').strip()
+    rec['template'] = tmpl_id or None
+    rec['from_template'] = bool(tmpl_id)
+
+    if tmpl_id:
+        tmpl = resolve_template(tmpl_id)
+        if tmpl is None:
+            raise RuntimeError('CAM-Vorlage nicht gefunden: %s' % tmpl_id)
+        strats = _template_strategies(tmpl)
+        if strats and not _template_matches_strategy(strats, strategy):
+            raise RuntimeError('CAM-Vorlage „%s“ passt nicht zu %s (Strategien: %s)'
+                               % (_safe(lambda: tmpl.name) or tmpl_id, strategy, ', '.join(strats) or '–'))
+        CFT = getattr(adsk.cam, 'CreateFromCAMTemplateInput', None) if adsk.cam else None
+        if CFT is None or not hasattr(setup, 'createFromCAMTemplate2'):
+            raise RuntimeError('Fusion-API unterstützt createFromCAMTemplate2 hier nicht')
+        tin = CFT.create()
+        tin.camTemplate = tmpl
+        modes = getattr(adsk.cam, 'AutomaticGenerationModes', None)
+        if modes is not None:
+            _safe(lambda: setattr(tin, 'mode', modes.SkipGeneration))
+        L.checkpoint('Operation aus Vorlage: %s (%s -> %s)', name, _safe(lambda: tmpl.name), strategy)
+        results = setup.createFromCAMTemplate2(tin)
+        created = _flatten_created(results)
+        rec['template_created'] = len(created)
+        comps, _extras = _compatible_ops(created, strategy)
+        if not comps:
+            _delete_created(created)
+            raise RuntimeError('CAM-Vorlage „%s“ hat keine passende %s-Operation erzeugt'
+                               % (_safe(lambda: tmpl.name) or tmpl_id, strategy))
+        rec['template_ops'] = comps
+        op = comps[0]
+        for o in comps:
+            if _safe(lambda: o.name) != name:
+                _safe(lambda: setattr(o, 'name', name))
+            _safe(lambda: o.attributes.add(GROUP, OP_ATTR, json.dumps(meta)))
+            _apply_tool_preset(o, tool, preset_name, rec)
+        rec['name'] = _safe(lambda: op.name)
+        rec['strategy'] = _safe(lambda: op.strategy) or strategy
+        return op
+
     inp = setup.operations.createInput(strategy)
     if tool is not None:
-        inp.tool = tool
-        pres = _safe(lambda: tool.presets)
-        if pres is not None and _safe(lambda: pres.count, 0):
-            _safe(lambda: setattr(inp, 'toolPreset', pres.item(0)))
-            rec['toolPreset'] = _safe(lambda: pres.item(0).name)
+        _apply_tool_preset(inp, tool, preset_name, rec)
     _safe(lambda: setattr(inp, 'displayName', name))
     L.checkpoint('Operation anlegen: %s (%s)', name, strategy)
     op = setup.operations.add(inp)
@@ -1024,21 +1352,11 @@ def lead_in_params(op, cfg, premill, rec):
 
 
 def feed_speed_params(op, cfg, premill, rec):
-    """Schnittwerte vf/spindle (vc/fz informativ in rec)."""
-    ps = op.parameters
+    """2.0.10: keine vf/spindle-Overrides mehr – Werkzeug-Preset bzw. Vorlage bleibt."""
     suf = _suf(premill)
-    vf = _cfg_f(cfg, 'vf' + suf, 0.0)
-    rpm = _cfg_f(cfg, 'spindle' + suf, 0.0)
-    vc = _cfg_f(cfg, 'vc' + suf, 0.0)
-    fz = _cfg_f(cfg, 'fz' + suf, 0.0)
-    if vf > 0:
-        set_number(ps, 'tool_feedCutting', vf, rec)
-        set_number(ps, 'feedrate', vf, rec)
-        set_number(ps, 'cuttingFeedrate', vf, rec)
-    if rpm > 0:
-        set_number(ps, 'tool_spindleSpeed', rpm, rec)
-        set_number(ps, 'spindleSpeed', rpm, rec)
-    rec['feeds'] = {'vf': vf, 'spindle': rpm, 'vc': vc, 'fz': fz}
+    rec['feeds'] = {'vf': _cfg_f(cfg, 'vf' + suf, 0.0), 'spindle': _cfg_f(cfg, 'spindle' + suf, 0.0),
+                    'vc': _cfg_f(cfg, 'vc' + suf, 0.0), 'fz': _cfg_f(cfg, 'fz' + suf, 0.0),
+                    'applied': False, 'source': 'preset'}
 
 
 def common_params(op, cfg, depth_mm, rec, finish=False, leave_mm=0.0, stock=None, premill=False):
@@ -1058,12 +1376,15 @@ def common_params(op, cfg, depth_mm, rec, finish=False, leave_mm=0.0, stock=None
     set_length(ps, 'bottomHeight_offset', -float(cfg['durchstich']) + leave, rec)
     cut_depth = max(0.1, float(depth_mm) - leave)
     suf = _suf(premill)
-    zst = _cfg_f(cfg, 'az' + suf, _cfg_f(cfg, 'zustellung', 6.0))
-    if not finish and 0 < zst < cut_depth - 1e-6:
-        set_bool(ps, 'doMultipleDepths', True, rec)
-        set_length(ps, 'maximumStepdown', zst, rec)
-    else:
-        set_bool(ps, 'doMultipleDepths', False, rec)
+    from_tmpl = bool((cfg.get('cam_template' + suf) or '').strip())
+    rec['from_template'] = from_tmpl
+    if not from_tmpl:
+        zst = _cfg_f(cfg, 'az' + suf, _cfg_f(cfg, 'zustellung', 6.0))
+        if not finish and 0 < zst < cut_depth - 1e-6:
+            set_bool(ps, 'doMultipleDepths', True, rec)
+            set_length(ps, 'maximumStepdown', zst, rec)
+        else:
+            set_bool(ps, 'doMultipleDepths', False, rec)
     if stock is None:
         zug = 0.0 if finish else float(cfg['schlicht_zugabe'])
     else:
@@ -1074,7 +1395,8 @@ def common_params(op, cfg, depth_mm, rec, finish=False, leave_mm=0.0, stock=None
         set_length(ps, 'verticalStockToLeave', 0.0, rec)
     else:
         set_bool(ps, 'useStockToLeave', False, rec)
-    lead_in_params(op, cfg, premill, rec)
+    if not from_tmpl:
+        lead_in_params(op, cfg, premill, rec)
     feed_speed_params(op, cfg, premill, rec)
 
 
@@ -1151,6 +1473,12 @@ def build_sheet_ops(cam, setup, sheet, plan, tool, cfg, version, state):
     def meta(kind, part=None):
         return {'kind': kind, 'sheet': sheet['name'], 'part': part, 'version': version}
 
+    pass_tools = (state or {}).get('pass_tools') or {}
+
+    def tool_for(premill=False):
+        key = 'vor' if premill else 'final'
+        return pass_tools.get(key) or pass_tools.get('default') or tool
+
     pf_start = pf_tabs = None
     try:
         recreate = bool(cfg['ersetzen'])
@@ -1215,6 +1543,8 @@ def build_sheet_ops(cam, setup, sheet, plan, tool, cfg, version, state):
         rec = {'op': label}
         try:
             op = fn(rec)
+            if rec.get('preset_warn'):
+                state['warnings'].append('%s: %s' % (label, rec['preset_warn']))
             if op is not None:
                 ops.append(op)
                 k = rec.get('strategy')
@@ -1236,7 +1566,8 @@ def build_sheet_ops(cam, setup, sheet, plan, tool, cfg, version, state):
         faces = [q['face'] for i in plan['order'] for q in parts[i]['geo']['pockets'] if q.get('face') is not None]
         if faces:
             def mk_pockets(rec):
-                op = new_op(setup, 'pocket2d', '%s%02d Taschen' % (PREFIX, nr()), tool, meta('taschen'), rec)
+                op = new_op(setup, 'pocket2d', '%s%02d Taschen' % (PREFIX, nr()), tool_for(False),
+                            meta('taschen'), rec, cfg=cfg, premill=False)
                 set_pockets(op, faces, rec)
                 set_choice(op.parameters, 'compensation', DIRECTION[_richtung_key(cfg, False)][1], DIRECTION[_richtung_key(cfg, False)][2], rec)
                 zst = float(cfg['zustellung'])
@@ -1268,7 +1599,7 @@ def build_sheet_ops(cam, setup, sheet, plan, tool, cfg, version, state):
                                  % (sheet['name'], ', '.join(bad)))
     order = [i for i in plan['order'] if not parts[i]['geo'].get('no_edges') and not sil_failed(i)]
 
-    def mk_inner(idx_list, label):
+    def mk_inner(idx_list, label, premill=False):
         def build(force=False):
             refresh(idx_list, force)
             pc = [e for i in idx_list for e in hole_chains(i, True)]
@@ -1279,12 +1610,19 @@ def build_sheet_ops(cam, setup, sheet, plan, tool, cfg, version, state):
             chains = build()
             if not chains:
                 return None
-            op = new_op(setup, 'contour2d', label, tool, meta('innen'), rec)
-            set_chains(op, chains, rec, refetch=lambda: build(True))
-            common_params(op, cfg, depth, rec)
-            set_bool(op.parameters, 'group_tabs', False, rec)
-            if len(chains) > 1:
-                set_bool(op.parameters, 'preserveOrder', True, rec)
+            op = new_op(setup, 'contour2d', label, tool_for(premill), meta('innen'), rec,
+                        cfg=cfg, premill=premill)
+            for o in _ops_from(rec, op):
+                set_chains(o, chains, rec, refetch=lambda: build(True))
+                if premill:
+                    common_params(o, cfg, depth, rec, finish=False, leave_mm=_vf_leave(),
+                                  stock=_vf_stock(), premill=True)
+                else:
+                    common_params(o, cfg, depth, rec)
+                set_bool(o.parameters, 'group_tabs', False, rec)
+                if len(chains) > 1:
+                    set_bool(o.parameters, 'preserveOrder', True, rec)
+            rec['premill'] = bool(premill)
             # 2.0.5: Startpunkte Innenkanten (gleiche nn_order wie chains)
             if pf_start is not None:
                 refresh(idx_list)
@@ -1346,27 +1684,28 @@ def build_sheet_ops(cam, setup, sheet, plan, tool, cfg, version, state):
             kind, mkey = 'Außen', 'aussen'
 
         def f(rec):
-            op = new_op(setup, 'contour2d', '%s%02d %s – %s' % (PREFIX, nr(), kind, p.get('name')), tool,
-                        meta(mkey, p.get('key')), rec)
+            op = new_op(setup, 'contour2d', '%s%02d %s – %s' % (PREFIX, nr(), kind, p.get('name')),
+                        tool_for(premill), meta(mkey, p.get('key')), rec, cfg=cfg, premill=premill)
             refresh([i])
-            set_chains(op, [outer_chain(i)], rec, refetch=lambda: (refresh([i], True), [outer_chain(i)])[1])
-            if premill:
-                common_params(op, cfg, depth, rec, finish=False, leave_mm=_vf_leave(), stock=_vf_stock(), premill=True)
-                tcfg, tabs_on = _op_tab_cfg(cfg, premill=True)
-                if tabs_on:
-                    mode = tab_params(op, tcfg, p['tabs'], p['per'], pf_tabs, rec)
+            for o in _ops_from(rec, op):
+                set_chains(o, [outer_chain(i)], rec, refetch=lambda: (refresh([i], True), [outer_chain(i)])[1])
+                if premill:
+                    common_params(o, cfg, depth, rec, finish=False, leave_mm=_vf_leave(), stock=_vf_stock(), premill=True)
+                    tcfg, tabs_on = _op_tab_cfg(cfg, premill=True)
+                    if tabs_on:
+                        mode = tab_params(o, tcfg, p['tabs'], p['per'], pf_tabs, rec)
+                    else:
+                        set_bool(o.parameters, 'group_tabs', False, rec)
+                        mode = 'keine'
                 else:
-                    set_bool(op.parameters, 'group_tabs', False, rec)
-                    mode = 'keine'
-            else:
-                common_params(op, cfg, depth, rec, finish=finish, premill=False)
-                tcfg, tabs_on = _op_tab_cfg(cfg, premill=False)
-                if tabs_on:
-                    mode = tab_params(op, tcfg, p['tabs'], p['per'], pf_tabs, rec)
-                else:
-                    set_bool(op.parameters, 'group_tabs', False, rec)
-                    mode = 'keine'
-            entry_param(op, pf_start, p['start'].get('entry') or p['start']['pt'], rec)
+                    common_params(o, cfg, depth, rec, finish=finish, premill=False)
+                    tcfg, tabs_on = _op_tab_cfg(cfg, premill=False)
+                    if tabs_on:
+                        mode = tab_params(o, tcfg, p['tabs'], p['per'], pf_tabs, rec)
+                    else:
+                        set_bool(o.parameters, 'group_tabs', False, rec)
+                        mode = 'keine'
+                entry_param(o, pf_start, p['start'].get('entry') or p['start']['pt'], rec)
             rec['part'] = p.get('name')
             rec['tabs'] = 0 if premill else len(p['tabs'])
             rec['premill'] = bool(premill)
@@ -1377,21 +1716,7 @@ def build_sheet_ops(cam, setup, sheet, plan, tool, cfg, version, state):
 
     # Innen: optional Vorfräs (ohne Tabs), dann Final
     def mk_inner_pass(idx_list, label, premill=False):
-        base = mk_inner(idx_list, label)
-        if not premill:
-            return base
-
-        def f(rec):
-            op = base(rec)
-            if op is None:
-                return None
-            common_params(op, cfg, depth, rec, finish=False, leave_mm=_vf_leave(), stock=_vf_stock(), premill=True)
-            tcfg, tabs_on = _op_tab_cfg(cfg, premill=True)
-            if not tabs_on:
-                set_bool(op.parameters, 'group_tabs', False, rec)
-            rec['premill'] = True
-            return op
-        return f
+        return mk_inner(idx_list, label, premill=premill)
 
     if cfg['innen_zuerst'] and _vf() and any(parts[i]['geo']['holes'] for i in order):
         guarded('Innen-Vorfräs', mk_inner_pass(order, '%s%02d Innen-Vorfräs' % (PREFIX, nr()), True))
@@ -1401,30 +1726,33 @@ def build_sheet_ops(cam, setup, sheet, plan, tool, cfg, version, state):
         def mk_all(rec, premill=False, finish=False):
             kind = 'Vorfräs' if premill else ('Schlicht' if finish else 'Außen')
             mkey = 'vorfraes' if premill else ('schlicht' if finish else 'aussen')
-            op = new_op(setup, 'contour2d', '%s%02d %s – alle Teile' % (PREFIX, nr(), kind), tool, meta(mkey), rec)
+            op = new_op(setup, 'contour2d', '%s%02d %s – alle Teile' % (PREFIX, nr(), kind),
+                        tool_for(premill), meta(mkey), rec, cfg=cfg, premill=premill)
             refresh(order)
-            set_chains(op, [outer_chain(i) for i in order], rec,
-                       refetch=lambda: (refresh(order, True), [outer_chain(i) for i in order])[1])
-            if premill:
-                common_params(op, cfg, depth, rec, finish=False, leave_mm=_vf_leave(), stock=_vf_stock(), premill=True)
-                tcfg, tabs_on = _op_tab_cfg(cfg, premill=True)
-                if tabs_on:
-                    tabs = [x for i in order for x in parts[i]['tabs']]
-                    tab_params(op, tcfg, tabs, sum(parts[i]['per'] for i in order), pf_tabs, rec)
+            for o in _ops_from(rec, op):
+                set_chains(o, [outer_chain(i) for i in order], rec,
+                           refetch=lambda: (refresh(order, True), [outer_chain(i) for i in order])[1])
+                if premill:
+                    common_params(o, cfg, depth, rec, finish=False, leave_mm=_vf_leave(), stock=_vf_stock(), premill=True)
+                    tcfg, tabs_on = _op_tab_cfg(cfg, premill=True)
+                    if tabs_on:
+                        tabs = [x for i in order for x in parts[i]['tabs']]
+                        tab_params(o, tcfg, tabs, sum(parts[i]['per'] for i in order), pf_tabs, rec)
+                    else:
+                        set_bool(o.parameters, 'group_tabs', False, rec)
                 else:
-                    set_bool(op.parameters, 'group_tabs', False, rec)
-            else:
-                common_params(op, cfg, depth, rec, finish=finish, premill=False)
-                tcfg, tabs_on = _op_tab_cfg(cfg, premill=False)
-                if tabs_on:
-                    tabs = [x for i in order for x in parts[i]['tabs']]
-                    tab_params(op, tcfg, tabs, sum(parts[i]['per'] for i in order), pf_tabs, rec)
-                else:
-                    set_bool(op.parameters, 'group_tabs', False, rec)
-            set_bool(op.parameters, 'preserveOrder', True, rec)
+                    common_params(o, cfg, depth, rec, finish=finish, premill=False)
+                    tcfg, tabs_on = _op_tab_cfg(cfg, premill=False)
+                    if tabs_on:
+                        tabs = [x for i in order for x in parts[i]['tabs']]
+                        tab_params(o, tcfg, tabs, sum(parts[i]['per'] for i in order), pf_tabs, rec)
+                    else:
+                        set_bool(o.parameters, 'group_tabs', False, rec)
+                set_bool(o.parameters, 'preserveOrder', True, rec)
             if pf_start is not None:
                 sps = [pf_start.add(*(parts[i]['start'].get('entry') or parts[i]['start']['pt'])) for i in order]
-                set_objects(op.parameters, 'entryPositions', sps, rec)
+                for o in _ops_from(rec, op):
+                    set_objects(o.parameters, 'entryPositions', sps, rec)
             rec['premill'] = bool(premill)
             return op
         # Innen

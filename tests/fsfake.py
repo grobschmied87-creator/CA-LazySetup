@@ -48,6 +48,12 @@ class Coll(list):
     def item(self, i):
         return self[i]
 
+    def itemByName(self, name):
+        for x in self:
+            if getattr(x, 'name', None) == name:
+                return x
+        return None
+
 
 class Transform:
     def __init__(self, ox=0.0, oy=0.0, oz=0.0):
@@ -598,6 +604,7 @@ class OpInput:
 class Operation:
     def __init__(self, setup, inp, cam):
         self.setup, self.strategy, self.tool = setup, inp.strategy, inp.tool
+        self.toolPreset = getattr(inp, 'toolPreset', None)
         self.name = inp.displayName or inp.strategy
         spec = {'contour2d': CONTOUR2D, 'pocket2d': POCKET2D}.get(inp.strategy, [])
         self.parameters = Params(spec, cam.missing, cam.failing)
@@ -643,6 +650,23 @@ class Setup:
     @property
     def allOperations(self):
         return Coll(self.operations)
+
+    def createFromCAMTemplate2(self, inp):
+        tmpl = getattr(inp, 'camTemplate', None)
+        if tmpl is None:
+            raise RuntimeError('no template')
+        created = []
+        tops = getattr(tmpl, 'operations', None)
+        n = getattr(tops, 'count', 0) if tops is not None else 0
+        for i in range(n):
+            tin = tops.get(i) if hasattr(tops, 'get') else tops.item(i)
+            st = getattr(tin, 'strategy', 'contour2d')
+            opin = OpInput(st)
+            opin.displayName = getattr(tmpl, 'name', '') or st
+            opin.tool = getattr(tin, 'tool', None)
+            opin.toolPreset = getattr(tin, 'toolPreset', None)
+            created.append(self.operations.add(opin))
+        return created
 
 
 class SetupInput:
@@ -698,9 +722,84 @@ class ToolLibraries:
         return Coll(self.libs.get(url.toString(), []))
 
 
+class ToolPreset:
+    def __init__(self, name):
+        self.name = name
+
+
+class CAMTemplateOp:
+    def __init__(self, strategy):
+        self.strategy = strategy
+        self.tool = None
+        self.toolPreset = None
+        self.displayName = strategy
+
+
+class CAMTemplateOps:
+    def __init__(self, strategies):
+        self._ops = [CAMTemplateOp(s) for s in strategies]
+
+    @property
+    def count(self):
+        return len(self._ops)
+
+    def get(self, i):
+        return self._ops[i]
+
+    def item(self, i):
+        return self._ops[i]
+
+
+class CAMTemplate:
+    def __init__(self, name, strategies=('contour2d',), hole=False, valid=True):
+        self.name = name
+        self.description = ''
+        self.isHoleTemplate = hole
+        self.isValidTemplate = valid
+        self.operations = CAMTemplateOps(strategies)
+
+
+class TemplateLibrary:
+    def __init__(self, folders=None):
+        # {url: {'folders': [url], 'templates': [CAMTemplate], 'assets': {url: CAMTemplate}}}
+        self.folders = folders or {}
+
+    def urlByLocation(self, loc):
+        if loc == 0:
+            return core.URL.create('tmpl/local')
+        if loc == 1:
+            return core.URL.create('tmpl/cloud')
+        return None
+
+    def childFolderURLs(self, url):
+        node = self.folders.get(url.toString(), {})
+        return [core.URL.create(u) for u in node.get('folders', [])]
+
+    def childTemplates(self, url):
+        node = self.folders.get(url.toString(), {})
+        return node.get('templates', [])
+
+    def childAssetURLs(self, url):
+        node = self.folders.get(url.toString(), {})
+        return [core.URL.create(u) for u in (node.get('assets') or {})]
+
+    def templateAtURL(self, url):
+        # search assets in all folders
+        key = url.toString()
+        for node in self.folders.values():
+            assets = node.get('assets') or {}
+            if key in assets:
+                return assets[key]
+        return None
+
+    def displayName(self, url):
+        return url.toString().rstrip('/').split('/')[-1]
+
+
 class LibraryManager:
     def __init__(self, libs):
         self.toolLibraries = ToolLibraries(libs)
+        self.templateLibrary = TemplateLibrary({})
 
 
 class CAM:

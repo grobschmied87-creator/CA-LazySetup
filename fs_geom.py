@@ -46,6 +46,12 @@ DEFAULTS = {
     'fz_final': 0.08,
     'spindle_final': 15000.0,
     'vf_final': 2400.0,
+    'tool_label_vor': '',
+    'cut_preset_vor': '',
+    'cam_template_vor': '',
+    'tool_label_final': '',
+    'cut_preset_final': '',
+    'cam_template_final': '',
     'innen_zuerst': True,
     'taschen': False,
     'gruppierung': 'je_teil',   # 'je_teil' / 'eine'

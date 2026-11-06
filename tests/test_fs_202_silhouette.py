@@ -554,7 +554,7 @@ class SilDiagAction(T0.Base):
         self.assertGreater(r['parts'], 0)
         with open(r['file'], encoding='utf-8-sig') as f:
             d = json.load(f)
-        self.assertEqual(d['version'], '2.0.9')
+        self.assertEqual(d['version'], '2.0.10')
         self.assertIn('faces', d['parts'][0]['data'])
         self.assertFalse(F.DIAG['on'])
         self.assertEqual(sum(len(o.component.sketches) for o in self.design.rootComponent.occurrences), n_sk)
