@@ -118,10 +118,70 @@
     return null;
   }
 
+  function pointInPoly(poly, q) {
+    if (!poly || poly.length < 3 || !q) return false;
+    var inside = false, x = q[0], y = q[1], i, j, xi, yi, xj, yj, denom;
+    for (i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      xi = poly[i][0]; yi = poly[i][1]; xj = poly[j][0]; yj = poly[j][1];
+      denom = yj - yi;
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (denom === 0 ? 1e-15 : denom) + xi))
+        inside = !inside;
+    }
+    return inside;
+  }
+  function partContains(part, q) {
+    if (!part || !pointInPoly(part.outer, q)) return false;
+    var holes = part.holes || [], i;
+    for (i = 0; i < holes.length; i++) if (pointInPoly(holes[i], q)) return false;
+    return true;
+  }
+  function polyArea(poly) {
+    var s = 0, i, j;
+    if (!poly || poly.length < 3) return 0;
+    for (i = 0, j = poly.length - 1; i < poly.length; j = i++)
+      s += (poly[j][0] + poly[i][0]) * (poly[j][1] - poly[i][1]);
+    return Math.abs(s / 2);
+  }
+  function hitPart(model, q) {
+    var best = null, bestA = Infinity, i, p, a;
+    if (!model || !model.parts) return { type: 'none', pt: q };
+    for (i = 0; i < model.parts.length; i++) {
+      p = model.parts[i];
+      if (!partContains(p, q)) continue;
+      a = polyArea(p.outer);
+      if (a < bestA) { bestA = a; best = p; }
+    }
+    return best ? { type: 'part', key: best.key, pt: q } : { type: 'none', pt: q };
+  }
+  function orderPickStart(keys) {
+    return { keys: (keys || []).slice(), picked: [], done: false, cancelled: false };
+  }
+  function orderPickClick(state, key) {
+    if (!state || state.done || state.cancelled) return state;
+    if (!key || state.keys.indexOf(key) < 0 || state.picked.indexOf(key) >= 0)
+      return { keys: state.keys, picked: state.picked.slice(), done: !!state.done, cancelled: false };
+    var picked = state.picked.concat([key]);
+    return { keys: state.keys, picked: picked, done: picked.length >= state.keys.length, cancelled: false };
+  }
+  function orderPickCancel(state) {
+    return { keys: (state && state.keys) || [], picked: ((state && state.picked) || []).slice(),
+      done: false, cancelled: true };
+  }
+  function orderPickResult(state) {
+    if (!state) return [];
+    var seen = {}, out = [];
+    (state.picked || []).forEach(function (k) { if (k && !seen[k]) { seen[k] = true; out.push(k); } });
+    (state.keys || []).forEach(function (k) { if (k && !seen[k]) { seen[k] = true; out.push(k); } });
+    return out;
+  }
+
   var api = { dist: dist, closestOnSeg: closestOnSeg, closestOnPoly: closestOnPoly, perimeter: perimeter,
     makeView: makeView, toScreen: toScreen, toWorld: toWorld, toMachine: toMachine, fromMachine: fromMachine,
     dirToMachine: dirToMachine, machToScreen: machToScreen, screenToMach: screenToMach, zoomAt: zoomAt, pan: pan, hitTest: hitTest,
-    clickOp: clickOp, snapToPart: snapToPart, dragOp: dragOp, partByKey: partByKey, DRAG_PX: 4 };
+    clickOp: clickOp, snapToPart: snapToPart, dragOp: dragOp, partByKey: partByKey,
+    pointInPoly: pointInPoly, partContains: partContains, hitPart: hitPart,
+    orderPickStart: orderPickStart, orderPickClick: orderPickClick, orderPickCancel: orderPickCancel,
+    orderPickResult: orderPickResult, DRAG_PX: 4 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.FSLogic = api;
 }(this));

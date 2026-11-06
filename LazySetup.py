@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""CA LazySetup 2.0.11 (vormals Finalschnitt 1.3.1) – Fertigschnitt (2D-Kontur) für CA-LazyNest-/ContourNest-Rohteile.
+"""CA LazySetup 2.0.12 (vormals Finalschnitt 1.3.1) – Fertigschnitt (2D-Kontur) für CA-LazyNest-/ContourNest-Rohteile.
 
 EIN Fenster (Palette, wie CA LazyNest): Kopf mit Logo, Register Rohteile / Werkzeug / Bearbeitung / Stege / Vorschau /
 Ergebnis, Infobox (Lizenz, Diagnose), hell/dunkel nach Fusion-Farbschema. In der Vorschau werden Halte-/Brückenstege
@@ -53,7 +53,7 @@ REFS = CORE.ca_refs
 DIAG = CORE.ca_diag
 PRODUCT = 'lazysetup'
 
-VERSION = '2.0.11'               # EINZIGE Versionsquelle (Manifest-Text, Tooltip, Protokoll, Operations-Attribut)
+VERSION = '2.0.12'               # EINZIGE Versionsquelle (Manifest-Text, Tooltip, Protokoll, Operations-Attribut)
 BUILD_DATE = '2026-11-06'
 APP_NAME = 'CA LazySetup'
 L.VERSION = VERSION
@@ -846,6 +846,8 @@ class PaletteHTML(adsk.core.HTMLEventHandler):
 
 class PaletteClosed(adsk.core.UserInterfaceGeneralEventHandler):
     def notify(self, args):
+        if _state.get('stopping'):
+            return
         _fire_soft(EV_PERSIST)
 
 
@@ -1062,13 +1064,43 @@ def run(context):
             _ui.messageBox('%s konnte nicht gestartet werden:\n%s' % (APP_NAME, tb))
 
 
+def _obj_valid(obj):
+    """Fusion-Proxy noch benutzbar? isValid=False oder Exception -> nein (kein Native-Zugriff danach)."""
+    if obj is None:
+        return False
+    try:
+        return getattr(obj, 'isValid', True) is not False
+    except Exception:
+        return False
+
+
+def _design_alive():
+    try:
+        if not _app:
+            return False
+        d = adsk.fusion.Design.cast(_app.activeProduct)
+        if d is None:
+            prod = F._safe(lambda: _app.activeDocument.products.itemByProductType('DesignProductType'))
+            d = adsk.fusion.Design.cast(prod) if prod else None
+        return _obj_valid(d)
+    except Exception:
+        return False
+
+
 def stop(context):
     try:
-        F._safe(lambda: E.persist_all(_state.get('sheets')))
+        _state['stopping'] = True
+        L.info('==== %s stop() start', APP_NAME)
+        if _design_alive():
+            F._safe(lambda: E.persist_all(_state.get('sheets')))
+        else:
+            L.info('stop(): persist übersprungen (kein gültiges Design)')
         if _ui:
             pal = F._safe(lambda: _ui.palettes.itemById(PALETTE_ID))
-            if pal is not None:
-                pal.deleteMe()
+            if _obj_valid(pal):
+                F._safe(lambda: pal.deleteMe())
+            else:
+                L.info('stop(): Palette deleteMe übersprungen')
         _state['pal_hooked'] = False
         _state['editor'] = None
         for ev_id, (ev, h) in list(_custom_events.items()):
@@ -1081,11 +1113,11 @@ def stop(context):
                 ws = F._safe(lambda: _ui.workspaces.itemById(ws_id))
                 panel = _panel(ws, pid)
                 ctl = F._safe(lambda: panel.controls.itemById(CMD_ID)) if panel else None
-                if ctl:
-                    ctl.deleteMe()
-            cd = _ui.commandDefinitions.itemById(CMD_ID)
-            if cd:
-                cd.deleteMe()
+                if _obj_valid(ctl):
+                    F._safe(lambda: ctl.deleteMe())
+            cd = F._safe(lambda: _ui.commandDefinitions.itemById(CMD_ID))
+            if _obj_valid(cd):
+                F._safe(lambda: cd.deleteMe())
     except Exception:
         L.exc('stop()')
     handlers.clear()

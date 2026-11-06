@@ -136,3 +136,16 @@ details summary { cursor: pointer; font-weight: 600; margin: 4px 0; }
 .order-row button.small, .order-head button.small { padding: 0 6px; min-width: 28px; }
 
 .fsub{font-size:11px;color:#a8d4a8;margin:8px 0 3px;font-weight:600;grid-column:1/-1}
+
+#view.order-pick { cursor: crosshair; }
+#view.order-pick svg { cursor: crosshair; }
+
+/* 2.0.12: Kontextmenü Vorschau (wie Nest) */
+#previewCtx.ctxmenu { position: fixed; z-index: 80; min-width: 220px; max-width: 280px;
+  background: var(--panel, #fff); color: var(--fg, #222); border: 1px solid var(--line, #ccc);
+  border-radius: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.28); padding: 4px 0; font-size: 12px; }
+#previewCtx button.ctxitem { display: flex; justify-content: space-between; align-items: center;
+  width: 100%; margin: 0; padding: 5px 12px; border: 0; border-radius: 0; background: transparent;
+  text-align: left; color: inherit; font: inherit; }
+#previewCtx button.ctxitem:hover:not(:disabled) { background: var(--acc, #2b6cb0); color: var(--accfg, #fff); }
+#previewCtx button.ctxitem:disabled { opacity: .4; cursor: default; }

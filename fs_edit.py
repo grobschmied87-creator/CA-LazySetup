@@ -75,12 +75,22 @@ def _ent(sheet):
     return sheet.get('occ')
 
 
+def _ent_valid(ent):
+    """Occurrence noch gültig? Nach Dokument-Schluss ist der Proxy tot – Native-Zugriff würde Fusion crashen."""
+    if ent is None:
+        return False
+    try:
+        return getattr(ent, 'isValid', True) is not False
+    except Exception:
+        return False
+
+
 def _key(sheet):
     """2.0.4: Zwischenspeicher je Rohteil-Name UND Occurrence – ein neues Rohteil gleichen Namens (Nesting
     gelöscht und neu angelegt) erbt keine Bearbeitungen des alten."""
     ent = _ent(sheet)
     tok = ''
-    if ent is not None:
+    if _ent_valid(ent):
         try:
             tok = ent.entityToken or ''
         except Exception:
@@ -106,30 +116,33 @@ def save(sheet, ov):
     ov = normalize(ov)
     _mem[_key(sheet)] = copy.deepcopy(ov)
     ent = _ent(sheet)
-    if ent is None:
+    if not _ent_valid(ent):
         return False
-    a = ent.attributes.itemByName(GROUP, ATTR)
-    if is_empty(ov):
-        if a is not None:
-            try:
-                a.deleteMe()
-            except Exception:
-                ent.attributes.add(GROUP, ATTR, '')
+    try:
+        a = ent.attributes.itemByName(GROUP, ATTR)
+        if is_empty(ov):
+            if a is not None:
+                try:
+                    a.deleteMe()
+                except Exception:
+                    ent.attributes.add(GROUP, ATTR, '')
+            return True
+        ent.attributes.add(GROUP, ATTR, json.dumps(ov, sort_keys=True))
         return True
-    ent.attributes.add(GROUP, ATTR, json.dumps(ov, sort_keys=True))
-    return True
+    except Exception:
+        return False
 
 
 def persist_all(sheets):
     """Zwischenspeicher in die Attribute schreiben (nach Ende des Dialogs). Anzahl geschriebener Rohteile."""
     n = 0
     for sh in sheets or []:
-        if _key(sh) in _mem:
-            try:
+        try:
+            if _key(sh) in _mem:
                 if save(sh, _mem[_key(sh)]):
                     n += 1
-            except Exception:
-                pass
+        except Exception:
+            pass
     return n
 
 

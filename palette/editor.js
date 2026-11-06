@@ -2,7 +2,8 @@
    Planung/Speichern in Python. Eingebettet in das Hauptfenster (window.LS_EMBED, main.js); allein lauffähig wie 1.3.1. */
 (function () {
   'use strict';
-  var LG = window.FSLogic, model = null, view = null, drag = null, lastKey = null, busy = false;
+  var LG = window.FSLogic, model = null, view = null, drag = null, lastKey = null, busy = false,
+      orderMode = null, ctxEl = null;
   function $(id) { return document.getElementById(id); }
   function setStatus(t, err) { var s = $('status'); s.textContent = t; s.className = err ? 'err' : ''; }
 
@@ -28,6 +29,7 @@
 
   function load(j) {
     var first = !model || !model.sheet || model.sheet.name !== j.sheet.name;
+    if (orderMode && !orderMode.applying && first) cancelOrderPick(true);
     model = j;
     var sel = $('selSheet'), names = j.sheets || [j.sheet.name];
     if (sel.options.length !== names.length || [].some.call(sel.options, function (o, i) { return o.value !== names[i]; })) {
@@ -108,9 +110,16 @@
           stroke: '#fff', 'stroke-width': 1 }, svg);
       });
       var c = LG.toScreen(view, p.centroid);
-      el('circle', { cx: c[0], cy: c[1], r: 11, fill: '#fff' }, svg);
-      var tx = el('text', { x: c[0], y: c[1] + 4, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold' }, svg);
-      tx.textContent = String(p.nr);
+      var pickIdx = (orderMode && orderMode.picked) ? orderMode.picked.indexOf(p.key) : -1;
+      var shown = pickIdx >= 0 ? String(pickIdx + 1) : (orderMode ? '' : String(p.nr));
+      var fill = pickIdx >= 0 ? '#1a7f37' : (orderMode ? '#d8d8d8' : '#fff');
+      el('circle', { cx: c[0], cy: c[1], r: 11, fill: fill,
+        stroke: pickIdx >= 0 ? '#0d4d22' : '#1e3c78', 'stroke-width': pickIdx >= 0 ? 1.6 : 1 }, svg);
+      if (shown) {
+        var tx = el('text', { x: c[0], y: c[1] + 4, 'text-anchor': 'middle', 'font-size': 12,
+          'font-weight': 'bold', fill: pickIdx >= 0 ? '#fff' : '#000' }, svg);
+        tx.textContent = shown;
+      }
     });
     if (drag && drag.moved && drag.kind !== 'pan') {
       var q = LG.toScreen(view, drag.to);
@@ -141,6 +150,95 @@
     var t = el('title', {}, g); t.textContent = 'Nullpunkt: ' + (sh.zero_text || '');
   }
   function evPt(ev) { var r = $('svg').getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; }
+  function tfmt(key, fallback, map) {
+    var s = (window.CA_I18n && CA_I18n.t(key)) || fallback;
+    if (s === key) s = fallback;
+    Object.keys(map || {}).forEach(function (k) { s = String(s).split('{' + k + '}').join(String(map[k])); });
+    return s;
+  }
+  function pickKeyAt(q) {
+    var h = LG.hitTest(model, view, q, 8);
+    if (h && h.key) return h.key;
+    var p = LG.hitPart(model, q);
+    return p && p.key ? p.key : null;
+  }
+  function partKeys() {
+    return (model && model.parts ? model.parts : []).map(function (p) { return p.key; }).filter(Boolean);
+  }
+  function startOrderPick() {
+    hideCtx();
+    var keys = partKeys();
+    if (!keys.length) { setStatus(tfmt('status.order_need_parts', 'Keine Teile für die Reihenfolge.'), true); return; }
+    orderMode = LG.orderPickStart(keys);
+    var box = $('view'); if (box) box.classList.add('order-pick');
+    setStatus(tfmt('status.order_pick', 'Teil {n} von {total} wählen …', { n: 1, total: keys.length }));
+    render();
+  }
+  function cancelOrderPick(silent) {
+    if (!orderMode) return;
+    orderMode = null;
+    var box = $('view'); if (box) box.classList.remove('order-pick');
+    if (!silent) setStatus(tfmt('status.order_cancel', 'Reihenfolge-Auswahl abgebrochen'));
+    if (model) render();
+  }
+  function finishOrderPick(st) {
+    orderMode = { applying: true, picked: st.picked, keys: st.keys };
+    send('edit', { op: 'order_set', order: st.picked.slice(), sheet: model.sheet.name }, function (rep) {
+      orderMode = null;
+      var box = $('view'); if (box) box.classList.remove('order-pick');
+      handleReply(rep);
+      setStatus(tfmt('status.order_done', 'Reihenfolge übernommen ({n} Teile)', { n: st.picked.length }));
+    });
+  }
+  function clickOrderPick(key) {
+    if (!orderMode || orderMode.applying) return;
+    var st = LG.orderPickClick(orderMode, key);
+    orderMode = st;
+    render();
+    if (st.done) finishOrderPick(st);
+    else setStatus(tfmt('status.order_pick', 'Teil {n} von {total} wählen …',
+      { n: st.picked.length + 1, total: st.keys.length }));
+  }
+  function hideCtx() { if (ctxEl) ctxEl.hidden = true; }
+  function ensureCtx() {
+    if (ctxEl) return ctxEl;
+    ctxEl = $('previewCtx') || document.createElement('div');
+    if (!ctxEl.id) ctxEl.id = 'previewCtx';
+    ctxEl.className = 'ctxmenu';
+    ctxEl.setAttribute('role', 'menu');
+    ctxEl.hidden = true;
+    if (!ctxEl.parentNode) document.body.appendChild(ctxEl);
+    ctxEl.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    ctxEl.addEventListener('mousedown', function (e) { e.stopPropagation(); });
+    document.addEventListener('mousedown', function (e) {
+      if (ctxEl && !ctxEl.hidden && !ctxEl.contains(e.target)) hideCtx();
+    });
+    return ctxEl;
+  }
+  function ctxItem(label, fn, disabled) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'ctxitem'; b.disabled = !!disabled;
+    b.textContent = label;
+    b.onclick = function () { hideCtx(); if (fn) fn(); };
+    return b;
+  }
+  function showCtxMenu(ev) {
+    if (!model) return;
+    var eln = ensureCtx();
+    eln.innerHTML = '';
+    eln.appendChild(ctxItem(tfmt('ctx.order_mouse', 'Reihenfolge mit Maus'), startOrderPick, !partKeys().length));
+    if (model.order_manual) {
+      eln.appendChild(ctxItem(tfmt('ctx.order_auto', 'Auto wiederherstellen'), function () {
+        if (!model) return;
+        send('edit', { op: 'order_clear', sheet: model.sheet.name }, handleReply);
+      }));
+    }
+    eln.hidden = false;
+    var x = ev.clientX, y = ev.clientY, pad = 8;
+    var w = eln.offsetWidth || 220, h = eln.offsetHeight || 48;
+    eln.style.left = Math.max(pad, Math.min(x, window.innerWidth - w - pad)) + 'px';
+    eln.style.top = Math.max(pad, Math.min(y, window.innerHeight - h - pad)) + 'px';
+  }
   function edit(op) {
     if (!op || busy) return;
     busy = true;
@@ -152,6 +250,8 @@
 
   function onDown(ev) {
     if (!model) return;
+    if (ev.button === 2) return;
+    hideCtx();
     var sp = evPt(ev), q = LG.toWorld(view, sp), hit = LG.hitTest(model, view, q, 8);
     if (hit.key) lastKey = hit.key;
     var kind = (hit.type === 'tab' || hit.type === 'start' || hit.type === 'start_hole' || hit.type === 'bridge') && !(ev.shiftKey || ev.altKey)
@@ -179,7 +279,14 @@
   function onUp() {
     if (!drag) return;
     var d = drag; drag = null;
-    if (!d.moved) { edit(LG.clickOp(d.hit, d.mods, d.q)); return; }
+    if (!d.moved) {
+      if (orderMode && !orderMode.applying) {
+        var key = pickKeyAt(d.q);
+        if (key) clickOrderPick(key);
+        return;
+      }
+      edit(LG.clickOp(d.hit, d.mods, d.q)); return;
+    }
     if (d.kind === 'tab' || d.kind === 'start' || d.kind === 'bridge') {
       var op = LG.dragOp(d.kind, d.hit.key, d.from, d.to, d.hit);
       if (op && d.hit.hole !== undefined && d.hit.hole !== null) op.hole = d.hit.hole;
@@ -219,6 +326,17 @@
       var hit = model && LG.hitTest(model, view, LG.toWorld(view, evPt(ev)), 8);
       if (!hit || hit.type === 'none') fit();
     });
+    svg.addEventListener('contextmenu', function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      if (!model) return;
+      if (orderMode && !orderMode.applying) return;
+      showCtxMenu(ev);
+    });
+    window.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Escape') return;
+      if (ctxEl && !ctxEl.hidden) { hideCtx(); ev.preventDefault(); return; }
+      if (orderMode && !orderMode.applying) { cancelOrderPick(false); ev.preventDefault(); }
+    });
     window.addEventListener('resize', fit);
     $('btnFit').onclick = fit;
     $('selSheet').onchange = function () { send('sheet', { name: $('selSheet').value }, handleReply); };
@@ -230,5 +348,5 @@
     if (!window.LS_EMBED) announce(0);
   });
   window.FinalschnittPalette = { model: function () { return model; }, view: function () { return view; }, load: load, fit: fit,
-    clear: function () { model = null; view = null; render(); } };
+    clear: function () { cancelOrderPick(true); model = null; view = null; render(); } };
 }());

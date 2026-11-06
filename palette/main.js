@@ -313,9 +313,13 @@
     var items = p.order_ui || [];
     if (!items.length) return;
     var head = el('div', { className: 'order-head' }, host);
-    head.appendChild(document.createTextNode('Bearbeitungsreihenfolge' + (p.order_manual ? ' (von Hand)' : '')));
+    var title = (window.CA_I18n && CA_I18n.t('order_manual')) || 'Bearbeitungsreihenfolge';
+    if (p.order_manual) title += (window.CA_I18n && CA_I18n.t('order_by_hand')) || ' (von Hand)';
+    head.appendChild(document.createTextNode(title));
     if (p.order_manual) {
-      var bAuto = el('button', { type: 'button', className: 'small', title: 'Automatische Reihenfolge' }, head, 'Auto');
+      var bAuto = el('button', { type: 'button', className: 'small',
+        title: (window.CA_I18n && CA_I18n.t('status.auto_order')) || 'Automatische Reihenfolge' }, head,
+        (window.CA_I18n && CA_I18n.t('order_auto')) || 'Auto');
       bAuto.onclick = function () { send('edit', { op: 'order_clear', sheet: (p.sheet || {}).name }, function (r) { var d = parse(r) || {}; if (d.plan) { loadPlan(d.plan); onPlan(d.plan); } }); };
     }
     items.forEach(function (it, idx) {

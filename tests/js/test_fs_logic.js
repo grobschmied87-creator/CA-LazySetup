@@ -72,4 +72,37 @@ t('1.3.0: quer liegendes Rohteil – Bildschirm = Maschinentisch, Welt = Materia
   // längs unverändert
   var vl = LG.makeView(1000, 500, 1024, 524, 12, 'laengs'); s = LG.toScreen(vl, [0, 0]); near(s[0], 12); near(s[1], 512);
 });
+t('pointInPoly / partContains / hitPart (interior, holes, innermost)', function () {
+  assert.strictEqual(LG.pointInPoly(sq, [50, 25]), true);
+  assert.strictEqual(LG.pointInPoly(sq, [50, -1]), false);
+  var withHole = { key: 'H#1', outer: [[0, 0], [100, 0], [100, 100], [0, 100]],
+    holes: [[[20, 20], [80, 20], [80, 80], [20, 80]]] };
+  assert.strictEqual(LG.partContains(withHole, [10, 10]), true);
+  assert.strictEqual(LG.partContains(withHole, [50, 50]), false);
+  var inner = { key: 'IN#1', outer: [[30, 30], [70, 30], [70, 70], [30, 70]], holes: [] };
+  var nest = { parts: [withHole, inner] };
+  assert.strictEqual(LG.hitPart(nest, [50, 50]).key, 'IN#1');
+  assert.strictEqual(LG.hitPart(nest, [10, 10]).key, 'H#1');
+  assert.strictEqual(LG.hitPart(nest, [200, 200]).type, 'none');
+  assert.strictEqual(LG.hitPart(model, [50, 25]).key, 'A#1');
+});
+t('orderPick: click order, ignore dups, done when all clicked, rest appended', function () {
+  var st = LG.orderPickStart(['a', 'b', 'c']);
+  assert.strictEqual(st.done, false);
+  st = LG.orderPickClick(st, 'b');
+  assert.deepStrictEqual(st.picked, ['b']);
+  st = LG.orderPickClick(st, 'b');
+  assert.deepStrictEqual(st.picked, ['b']);
+  st = LG.orderPickClick(st, 'nope');
+  assert.deepStrictEqual(st.picked, ['b']);
+  assert.deepStrictEqual(LG.orderPickResult(st), ['b', 'a', 'c']);
+  st = LG.orderPickClick(st, 'a');
+  st = LG.orderPickClick(st, 'c');
+  assert.strictEqual(st.done, true);
+  assert.deepStrictEqual(st.picked, ['b', 'a', 'c']);
+  assert.deepStrictEqual(LG.orderPickResult(st), ['b', 'a', 'c']);
+  var c = LG.orderPickCancel(st);
+  assert.strictEqual(c.cancelled, true);
+  assert.strictEqual(c.done, false);
+});
 console.log('JS OK ' + n);
