@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""LazySetup 2.0.10: Werkzeug-Schnittdaten-Presets + CAM-Vorlagen (Lokal/Cloud)."""
+"""LazySetup 2.0.11: Werkzeug-Schnittdaten-Presets + CAM-Vorlagen (Lokal/Cloud)."""
 import os
 import sys
 import unittest
@@ -219,7 +219,7 @@ class TestI18nAndUi(unittest.TestCase):
         self.assertIn("f.kind === 's'", js)
         html = open(os.path.join(HERE, 'palette', 'index.html'), encoding='utf-8').read()
         self.assertIn('preset_feeds', html)
-        self.assertIn('v2.0.10', html)
+        self.assertIn('v2.0.11', html)
         self.assertNotIn('Vorlage Schnittwerte', html)
 
 

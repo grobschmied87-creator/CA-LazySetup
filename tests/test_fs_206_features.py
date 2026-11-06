@@ -17,7 +17,7 @@ from ca_core import ca_i18n
 class TestVersion(unittest.TestCase):
     def test_version(self):
         import LazySetup as LS
-        self.assertEqual(LS.VERSION, '2.0.10')
+        self.assertEqual(LS.VERSION, '2.0.11')
 
 
 class TestI18n(unittest.TestCase):

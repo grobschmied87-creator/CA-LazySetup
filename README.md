@@ -2,7 +2,7 @@
 
 Fusion 360 add-in that prepares 2D/CNC milling setups: silhouette contours, tabs/bridges, roughing & finishing passes, tool selection, live plan preview.
 
-**Version:** 2.0.10 · **License:** MIT · Author: Chris Adam / Chris Adam Modellbau
+**Version:** 2.0.11 · **License:** MIT · Author: Chris Adam / Chris Adam Modellbau
 
 ## Features
 - Dual-pass workflow (roughing + finishing) with separate direction and tab options

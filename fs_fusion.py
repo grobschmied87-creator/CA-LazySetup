@@ -385,12 +385,56 @@ def face_dump(regs, recs, keys, fp=None, info=None):
 DIAG = {'on': False, 'parts': []}
 FAST_TOL_LOOSE = 0.5   # mm (2.0.3): Schnellweg-Toleranz der letzten Stufe (nur wenn die Silhouette offen bleibt)
 CACHE_SIG = None       # 2.0.2: Konstruktionsstand (fs_run.core_sig); None = kein Zwischenspeicher
-GEO_CACHE = {}         # (Stand, Occurrence-Token, Rahmen, Körper-Tokens) -> (Ergebnis, Hinweise)
+GEO_CACHE = {}         # (Stand, Occurrence-Token, Rahmen, Körper-Tokens, Pose) -> (Ergebnis, Hinweise)
 CACHE_STATS = {'hit': 0, 'miss': 0}
+LAST_NEST_SIG = None   # 2.0.11: Nest-Lage (Transforms/Attribute); Abweichung leert GEO_CACHE
 
 
 def clear_cache():
     GEO_CACHE.clear()
+
+
+def _round3(v):
+    try:
+        return round(float(v), 3)
+    except (TypeError, ValueError):
+        return None
+
+
+def _occ_pose_key(occ):
+    """Lage (transform2 + Nest-Attribute), damit Verschieben den Geo-Cache invalidiert."""
+    pose = None
+    cs = _safe(lambda: occ.transform2.getAsCoordinateSystem()) if occ is not None else None
+    if cs and len(cs) == 4:
+        def xyz(pt):
+            return (round(float(pt.x), 6), round(float(pt.y), 6), round(float(pt.z), 6))
+        try:
+            o, x, y, z = cs
+            pose = xyz(o) + xyz(x) + xyz(y) + xyz(z)
+        except Exception:
+            pose = None
+    attrs = attrs_of(occ) if occ is not None else {}
+    nest = (_round3(attrs.get('pos_x_mm')), _round3(attrs.get('pos_y_mm')),
+            _round3(attrs.get('rotation_deg')),
+            str(attrs.get('project_sheet') or attrs.get('sheet') or ''),
+            str(attrs.get('copy') or ''), str(attrs.get('flipped') or ''))
+    return (pose, nest)
+
+
+def nest_layout_sig(design):
+    """Kompakte Nest-Lage aller Rohteile und Kinder (ohne computeAll)."""
+    if design is None:
+        return None
+    recs = [('design', _safe(lambda: design.parentDocument.name), id(design))]
+    for occ, d in find_sheets(design):
+        recs.append((_safe(lambda: occ.entityToken) or _safe(lambda: occ.name),
+                     _occ_pose_key(occ),
+                     str((d or {}).get('project_sheet') or (d or {}).get('index') or ''),
+                     str((d or {}).get('project_id') or '')))
+        for po in _children(occ):
+            recs.append((_safe(lambda: po.entityToken) or _safe(lambda: po.name),
+                         _occ_pose_key(po)))
+    return tuple(recs)
 
 
 def _cache_key(occ, frame, bodies):
@@ -400,7 +444,8 @@ def _cache_key(occ, frame, bodies):
     bt = tuple(_safe(lambda b=b: b.entityToken) for b in bodies)
     if not t or not all(bt):
         return None
-    return (CACHE_SIG, t, tuple(round(v, 6) for v in frame.o + frame.x + frame.y), bt)
+    return (CACHE_SIG, t, tuple(round(v, 6) for v in frame.o + frame.x + frame.y), bt,
+            _occ_pose_key(occ))
 
 
 def _fresh_copy(res):
@@ -866,8 +911,9 @@ def find_sheets(design):
 
 def read_sheet(occ, d, cam=None, warn=None, design=None, log=None):
     """Ein Rohteil mit allen Teilkonturen (für fs_geom.plan_sheet) inkl. Fusion-Objekten.
-    2D-Kontur: aus der B-Rep (Unter-/Oberseite), sonst aus den Projekt-Daten (Design-Attribut
-    ContourNest/project_<id>). Kanten für die Kettenauswahl immer aus der B-Rep, bevorzugt im CAM-Kontext.
+    2D-Kontur: Live-Silhouette der Occurrence (B-Rep). Projekt-JSON (ContourNest/project_<id>) nur
+    zum Vergleich/zur Warnung; Fallback auf Projekt-Lagen nur ohne lesbare Teil-Occurrence.
+    Kanten für die Kettenauswahl immer aus der B-Rep, bevorzugt im CAM-Kontext.
     log(text): Protokoll-Funktion (jede Zeile)."""
     warn = warn if warn is not None else []
     log = log or (lambda t: None)
@@ -966,19 +1012,20 @@ def read_sheet(occ, d, cam=None, warn=None, design=None, log=None):
             if kpl is not None:
                 bad, txt = compare_project(g, pp[kpl])
                 ov = _bbox_overlap(G.bbox(g['outer']['pts']), G.bbox(pp[kpl]['outer']))
+                ov = max(0.0, min(1.0, ov)) if ov == ov else 0.0
                 if ov < 0.5:
-                    # Hüllboxen überlappen kaum: anderer Koordinatenraum? 2D-Planung aus dem Projekt, Kanten B-Rep
-                    outer2d, holes2d = pp[kpl]['outer'], pp[kpl]['holes']
-                    rec['geometry'] += ' – 2D-Planung aus Projekt-Daten (Silhouette-Lage weicht ab, Überdeckung ' \
-                        '%.0f %%)' % (ov * 100)
-                    warn.append('%s / %s: Silhouette liegt nicht an der LazyNest-Position – Vorschau aus Projekt-Daten'
-                                % (sheet['name'], nm))
+                    # 2.0.11: Live-Silhouette bleibt Zeichenquelle; JSON nur Diagnose (nach Renest ist das Nest wahr)
+                    rec['geometry'] += ' – Lage weicht vom gespeicherten Nest-Projekt ab (Überdeckung ' \
+                        '%.0f %%), Vorschau aus dem Modell' % (ov * 100)
+                    warn.append('%s / %s: Silhouette weicht von der LazyNest-Position ab (Überdeckung '
+                                '%.0f %%) – Vorschau aus dem Modell' % (sheet['name'], nm, ov * 100))
                 elif bad:
                     msg = '%s / %s: Silhouette weicht von der LazyNest-Kontur ab (%s) – geschnitten wird die ' \
                           'Silhouette' % (sheet['name'], nm, txt)
                     why.append('Silhouette ≠ LazyNest: ' + txt)
                     warn.append(msg)
         else:
+            # 2.0.11: kein part_geometry-Ergebnis – JSON nur als Vorschau ohne Kanten (keine Live-Silhouette)
             q = pp[kpl]
             outer2d, holes2d = q['outer'], q['holes']
             g = {'face': None, 'z_bottom': 0.0, 'outer': {'pts': outer2d, 'edges': [], 'first_opposed': False},

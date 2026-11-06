@@ -16,7 +16,11 @@ def collect(design, cam=None, names=None, warn=None):
     """Rohteile mit Konturen; names = Liste der gewählten Rohteil-Namen (None = alle)."""
     out = []
     F.CACHE_SIG = tuple(core_sig(design)) if core_sig(design)[1] is not None else None   # 2.0.2
-    if len(F.GEO_CACHE) > 2000:
+    nest = F.nest_layout_sig(design)
+    if nest != F.LAST_NEST_SIG:
+        F.clear_cache()                    # 2.0.11: Nest-Lage/Attribute geändert -> keine alten Umrisse
+        F.LAST_NEST_SIG = nest
+    elif len(F.GEO_CACHE) > 2000:
         F.clear_cache()
     for occ, d in F.find_sheets(design):
         nm = _safe(lambda: occ.name, '')

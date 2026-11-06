@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""CA LazySetup 2.0.10 (vormals Finalschnitt 1.3.1) – Fertigschnitt (2D-Kontur) für CA-LazyNest-/ContourNest-Rohteile.
+"""CA LazySetup 2.0.11 (vormals Finalschnitt 1.3.1) – Fertigschnitt (2D-Kontur) für CA-LazyNest-/ContourNest-Rohteile.
 
 EIN Fenster (Palette, wie CA LazyNest): Kopf mit Logo, Register Rohteile / Werkzeug / Bearbeitung / Stege / Vorschau /
 Ergebnis, Infobox (Lizenz, Diagnose), hell/dunkel nach Fusion-Farbschema. In der Vorschau werden Halte-/Brückenstege
@@ -53,7 +53,7 @@ REFS = CORE.ca_refs
 DIAG = CORE.ca_diag
 PRODUCT = 'lazysetup'
 
-VERSION = '2.0.10'               # EINZIGE Versionsquelle (Manifest-Text, Tooltip, Protokoll, Operations-Attribut)
+VERSION = '2.0.11'               # EINZIGE Versionsquelle (Manifest-Text, Tooltip, Protokoll, Operations-Attribut)
 BUILD_DATE = '2026-11-06'
 APP_NAME = 'CA LazySetup'
 L.VERSION = VERSION
